@@ -1,0 +1,269 @@
+/*
+ * Layout notes for anyone editing this:
+ * - The canvas fills the viewport; every panel is an overlay, so the
+ *   interactive surface is never clipped by chrome.
+ * - Panels are keyed off `--pad`, which `@media (short)` shrinks so landscape
+ *   phones (short viewports) keep the middle of the screen free for drawing.
+ * - Nothing uses hover-only affordances: every control is a real button with a
+ *   >=44px target, because this runs on Android touch first.
+ */
+:root {
+  --bg: #06070d;
+  --ink: #e9edff;
+  --ink-dim: rgba(233, 237, 255, 0.66);
+  --ink-faint: rgba(233, 237, 255, 0.42);
+  --panel: rgba(11, 13, 22, 0.72);
+  --panel-border: rgba(150, 170, 230, 0.18);
+  --accent: #8bd3ff;
+  --pad: 18px;
+  --radius: 14px;
+  --gutter: max(var(--pad), env(safe-area-inset-left));
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, "DejaVu Sans", sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+#stage { position: fixed; inset: 0; }
+
+#field {
+  position: absolute;
+  inset: 0;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+#brand {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + var(--pad));
+  left: var(--gutter);
+  pointer-events: none;
+}
+
+#brand h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+#brand p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+}
+
+#learn {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 74px);
+  left: var(--gutter);
+  width: min(400px, calc(100vw - 2 * var(--gutter)));
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(9px);
+  transition: opacity 420ms ease, transform 420ms ease;
+}
+
+#learn h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+#learn ol { margin: 0; padding-left: 20px; }
+
+#learn li {
+  margin: 0 0 7px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+#learn li b { color: var(--ink); font-weight: 650; }
+
+#learn .why {
+  margin: 11px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(150, 170, 230, 0.14);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+#learn[hidden] { display: none; }
+
+#learn.dismissed {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+}
+
+#readout {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 86px);
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+#meters {
+  position: absolute;
+  right: var(--gutter);
+  top: calc(env(safe-area-inset-top, 0px) + var(--pad));
+  display: flex;
+  gap: 8px;
+}
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 58px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+}
+
+.meter .label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.meter .value {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+#controls {
+  position: absolute;
+  left: var(--gutter);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--pad));
+  display: flex;
+  gap: 10px;
+}
+
+#controls button {
+  min-height: 44px;
+  min-width: 96px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(9px);
+}
+
+#controls button:active {
+  background: rgba(139, 211, 255, 0.22);
+  border-color: var(--accent);
+}
+
+#controls button[aria-pressed="true"] {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+
+#about {
+  position: absolute;
+  right: var(--gutter);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--pad));
+  max-width: min(430px, calc(100vw - 2 * var(--gutter)));
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(9px);
+  font-size: 13px;
+}
+
+#about summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  min-height: 24px;
+}
+
+#about .about-body {
+  max-height: min(46vh, 340px);
+  overflow-y: auto;
+  margin-top: 8px;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+#about p { margin: 0 0 8px; }
+
+#about b { color: var(--ink); }
+
+#about kbd {
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.07);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+/*
+ * Landscape phones: ~360-430px of height. Move the lesson beside the canvas
+ * instead of on top of it, and shrink type so nothing covers the strings.
+ */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root { --pad: 12px; }
+  #brand h1 { font-size: 17px; }
+  #learn {
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+    left: var(--gutter);
+    width: min(360px, 44vw);
+    padding: 11px 13px;
+  }
+  #learn li { font-size: 12px; margin-bottom: 4px; }
+  #learn .why { display: none; }
+  #readout { bottom: calc(env(safe-area-inset-bottom, 0px) + 62px); font-size: 12px; }
+  #controls button { min-height: 44px; min-width: 84px; font-size: 12.5px; }
+  #about { max-width: 30vw; }
+}
+
+/* Narrow portrait phones: keep the lesson readable but out of the way. */
+@media (orientation: portrait) and (max-width: 420px) {
+  #learn { width: calc(100vw - 2 * var(--gutter)); padding: 13px 15px; }
+  #learn li { font-size: 13px; }
+  #meters .meter { min-width: 50px; padding: 5px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #learn { transition: none; }
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Aurelia - draw an instrument</title>
+<style>
+/* __STYLE__ */
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="field" aria-label="Drawing surface. Drag on empty space to create a string, drag across a string to pluck it."></canvas>
+
+  <header id="brand">
+    <h1>Aurelia</h1>
+    <p>an instrument you draw with your finger</p>
+  </header>
+
+  <!--
+    Teaching panel. It states the three verbs in plain language and disappears
+    the first time the player makes a string, because after that the readout
+    below is more useful than instructions.
+  -->
+  <section id="learn" aria-live="polite">
+    <h2>Three things to try</h2>
+    <ol>
+      <li><b>Drag on empty space</b> to stretch a new string. Longer makes it lower; crossing another string makes it an independent voice.</li>
+      <li><b>Drag across a string</b> to pluck it. Rub along it to bow, and hold still to mute.</li>
+      <li><b>Drag a bright endpoint</b> to retune that string while it rings.</li>
+    </ol>
+    <p class="why">Strings near each other shake the space between them, so a pluck spreads into the neighbours. What you hear is that wave: each string's length sets its pitch, and the shape you leave in it sets its timbre.</p>
+  </section>
+
+  <div id="readout" role="status" aria-live="polite">
+    <span id="readout-detail">Ready - drag anywhere</span>
+  </div>
+
+  <div id="meters" aria-hidden="true">
+    <div class="meter"><span class="label">strings</span><span class="value" id="m-strings">0</span></div>
+    <div class="meter"><span class="label">ringing</span><span class="value" id="m-ringing">0</span></div>
+    <div class="meter"><span class="label">pitch</span><span class="value" id="m-pitch">-</span></div>
+  </div>
+
+  <div id="controls">
+    <button type="button" data-action="mute" aria-pressed="false">Sound on</button>
+    <button type="button" data-action="clear">Clear</button>
+  </div>
+
+  <details id="about">
+    <summary>How it works</summary>
+    <div class="about-body">
+      <p>Every line you draw becomes a real wave simulation: a thread pinned at both ends, integrated a few dozen times per second. Touching it displaces the thread; the wave then runs out to the pinned ends, reflects, and interferes with itself. That interference is what your ear hears as a pitch.</p>
+      <p><b>Length sets pitch.</b> Halve a string's length and the pitch goes up an octave &mdash; the readout shows the number so you can hear it happen.</p>
+      <p><b>Shape sets timbre.</b> A sharp triangular pluck contains many overtones and sounds bright. Rubbing along a string pushes it gently toward a single smooth curve, which sounds pure and sustained.</p>
+      <p><b>Proximity sets harmony.</b> Strings close together push on each other, so nearby strings drift in and out of phase. Crossing a string while drawing makes the new one ignore that coupling, which is how you get two independent voices instead of one blurred chord.</p>
+      <p>Keys: <kbd>C</kbd> clear, <kbd>Z</kbd> undo, <kbd>M</kbd> mute, <kbd>D</kbd> reset demo. Sound starts on your first touch, because browsers require a gesture before audio.</p>
+    </div>
+  </details>
+</div>
+<script type="module">
+/* __APP__ */
+</script>
+</body>
+</html>
