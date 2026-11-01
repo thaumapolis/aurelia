@@ -21,6 +21,11 @@ import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const REQUIRED_ENV = ['PLAYWRIGHT_ENTRY', 'PLAYWRIGHT_BROWSERS_PATH'];
+
+/** Shorten a wall of engine flags to something a test failure can be read in. */
+function truncate(text, limit = 400) {
+  return text.length <= limit ? text : `${text.slice(0, limit)} ...[truncated ${text.length - limit} chars]`;
+}
 export const DEFAULT_ENGINE = 'firefox';
 
 function missingEnv() {
@@ -73,14 +78,29 @@ async function supportsNativeTouch(page) {
 export async function openScene(engines, engineName, scene, url) {
   const engine = engines[engineName];
   if (!engine) throw new Error(`this Playwright build does not expose "${engineName}"`);
-  const browser = await engine.launch({
-    // Chromium's own sandbox needs user-namespace syscalls that the environments
-    // these checks run in may not grant; the page is local, so this flag is about
-    // the harness rather than the app.
-    args: engineName === 'chromium'
-      ? ['--no-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required']
-      : [],
-  });
+  let browser;
+  try {
+    browser = await engine.launch({
+      // Playwright already passes --no-sandbox and --disable-dev-shm-usage for
+      // chromium, so only the autoplay policy is added here; asking for them
+      // twice is how one ends up wondering which of the two is doing anything.
+      args: engineName === 'chromium' ? ['--autoplay-policy=no-user-gesture-required'] : [],
+    });
+  } catch (error) {
+    // Playwright's launch failure prepends the entire command line, which runs
+    // to about ten kilobytes of flags for chromium and buries the one line that
+    // matters. Keep the reason, and the last line of browser output, which is
+    // where a sandbox denial says what it denied.
+    const detail = String(error.message ?? error);
+    const fatal = detail
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.includes('FATAL') || line.includes('Operation not permitted'));
+    throw new Error(
+      `${engineName} could not start${fatal ? `: ${fatal}` : '.\n' + truncate(detail)}`,
+      { cause: error },
+    );
+  }
   const context = await browser.newContext({
     viewport: { width: scene.width, height: scene.height },
     deviceScaleFactor: scene.device ? 2 : 1,

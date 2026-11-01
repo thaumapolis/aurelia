@@ -16,7 +16,7 @@ if [[ -z $NODE ]]; then
 fi
 
 # 1. Build. Tests read the artifact, so a stale artifact must not be able to pass.
-report "1/4 build artifact"
+report "1/5 build artifact"
 if "$NODE" tools/build.mjs; then
   :
 else
@@ -25,7 +25,7 @@ fi
 
 # 2. Bundles and tools must parse. Cheap, and it localises a syntax error to the
 #    file that has it rather than to whichever test happened to import it first.
-report "2/4 syntax"
+report "2/5 syntax"
 for file in src/*.js tools/*.mjs tests/*.mjs; do
   if ! "$NODE" --experimental-vm-modules -e '
     const fs = require("fs"), vm = require("vm");
@@ -43,7 +43,7 @@ done
 # result per *file*, so its "# pass" line counts files and could read 3 while the
 # suite inside it had failed to even load. Running the files and summing their own
 # counts is what makes the minimum-test-count guard below mean something.
-report "3/4 unit + interaction tests"
+report "3/5 unit + interaction tests"
 : >.tmp/test-output.txt
 PASSED_TOTAL=0
 for spec in tests/sim.test.mjs tests/app.test.mjs tests/build.test.mjs; do
@@ -70,10 +70,25 @@ if [[ $PASSED_TOTAL -lt 40 ]]; then
   fail "expected at least 40 tests to pass, counted $PASSED_TOTAL"
 fi
 
-# 4. Golden screenshots. Needs a browser, which needs privileges the plain
+# 4. Engine coverage. The goldens are painted by one engine, which says nothing
+#    about whether the app runs in the others people actually use, so each
+#    required engine is booted and played with in turn. See tools/browser.mjs for
+#    which ones can start in which sandbox.
+report "4/5 engine coverage"
+if [[ -n ${PLAYWRIGHT_ENTRY:-} && -n ${PLAYWRIGHT_BROWSERS_PATH:-} ]]; then
+  if "$NODE" tests/engines.test.mjs; then
+    :
+  else
+    fail "engine coverage failed"
+  fi
+else
+  fail "browser toolchain is not configured, so no engine beyond none was checked"
+fi
+
+# 5. Golden screenshots. Needs a browser, which needs privileges the plain
 #    sandbox does not grant; without it the visual contract is unverified, so
 #    this is a failure and not a skip.
-report "4/4 golden screenshots"
+report "5/5 golden screenshots"
 if [[ -n ${PLAYWRIGHT_ENTRY:-} && -n ${PLAYWRIGHT_BROWSERS_PATH:-} ]]; then
   if "$NODE" tests/golden.test.mjs "$@"; then
     :
