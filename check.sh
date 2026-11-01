@@ -30,6 +30,14 @@ if [[ -z $NODE ]]; then
   exit $STATUS
 fi
 
+# Scratch space for the test output below. It is gitignored, so a fresh checkout
+# - CI, or anyone who has never run this - has no .tmp, and a shell redirect to a
+# directory that does not exist fails before the command runs. That reported
+# "0 passed, 0 failed" for every suite while executing none of them: a failure,
+# but one that describes the harness rather than the code, which is the worst
+# kind to debug from a red build.
+mkdir -p .tmp
+
 # 1. Build. Tests read the artifact, so a stale artifact must not be able to pass.
 report "1/5 build artifact"
 if "$NODE" tools/build.mjs; then
@@ -70,8 +78,15 @@ for spec in tests/sim.test.mjs tests/app.test.mjs tests/build.test.mjs; do
   fi
   passed=$(grep -E '^# pass [0-9]+$' .tmp/one-test.txt | tail -n 1 | awk '{print $3}')
   failed=$(grep -E '^# fail [0-9]+$' .tmp/one-test.txt | tail -n 1 | awk '{print $3}')
-  passed=${passed:-0}
-  failed=${failed:-0}
+  # A missing count means the runner never produced TAP output at all, which is
+  # not the same as zero tests passing. Say so instead of defaulting to 0: when
+  # this defaulted, a harness that could not write its output file reported
+  # "0 passed, 0 failed" and the reason was buried three lines away.
+  if [[ -z $passed || -z $failed ]]; then
+    fail "$spec produced no TAP summary - it did not run to completion"
+    passed=${passed:-0}
+    failed=${failed:-1}
+  fi
   PASSED_TOTAL=$((PASSED_TOTAL + passed))
   printf '%-26s %s passed, %s failed\n' "$spec" "$passed" "$failed"
   if [[ $failed -ne 0 ]]; then
