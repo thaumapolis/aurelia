@@ -70,7 +70,8 @@ export const Proximity = {
   End: 'end',
 };
 
-const clamp = (value, low, high) => (value < low ? low : value > high ? value : value);
+/** Shared clamp; exported because every module in the bundle uses the same one. */
+export const clamp = (value, low, high) => (value < low ? low : value > high ? value : value);
 
 /** Deterministic PRNG so a seed always yields the same starting strings. */
 export function makeRandom(seed) {
@@ -291,6 +292,25 @@ export class StringLine {
    */
   pitchHz() {
     return PITCH_ANCHOR_HZ * (PITCH_REFERENCE_PX / Math.max(this.lengthPx, 1));
+  }
+
+  /**
+   * A frozen, soundless copy of this string, for drawing the same instant twice.
+   *
+   * Used by the screenshot check that measures how much of a frame the
+   * instrument is responsible for: it paints the picture, then paints it again
+   * without the instrument, and the difference is the strings. Both passes have
+   * to show the same wave, and the second one happens after a screenshot has
+   * been taken, so it cannot read the live arrays.
+   *
+   * Deliberately not `structuredClone` of the line: the copy is only ever
+   * rendered, so it carries the geometry and the displacement and nothing that
+   * could couple it back into the simulation.
+   */
+  cloneForDisplay() {
+    const copy = Object.create(Object.getPrototypeOf(this));
+    Object.assign(copy, this, { u: this.u.slice(), v: this.v.slice() });
+    return copy;
   }
 
   /** Peak |displacement| — what the visuals and loudness read. */
