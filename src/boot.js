@@ -21,20 +21,34 @@ function readOverrides(search) {
 }
 
 /**
- * A deterministic clock for golden screenshots: stepping `dt` by hand makes the
- * wave field identical pixel-for-pixel across machines and runs.
+ * A deterministic clock for screenshots and automation.
+ *
+ * rAF drives the simulation with a browser-supplied timestamp, so the wave field
+ * after "one second" depends on how busy the machine was. Stepping by hand makes
+ * frame N mean the same thing on every machine, which is the only way a golden
+ * image can be compared at all. Installed unconditionally, because a testing
+ * affordance that appears only under a special URL is one bad test away from
+ * being unused.
  */
-function installScriptedFrameLoop(app) {
-  let pending = null;
+function installDeterministicStepping(app, { quiet }) {
+  // `frame()` rather than a hand-rolled step: it keeps the app in charge of the
+  // clock that pluck and bow are measured against, so a stepped run and a live
+  // one agree about how fast a finger was moving.
   globalThis.__aureliaStep = (frames = 1, dt = 1 / 60) => {
-    for (let i = 0; i < frames; i += 1) {
-      app.instrument.step(dt, []);
-      app.render();
-    }
+    for (let i = 0; i < frames; i += 1) app.frame(dt * 1000, dt * 1000);
     return { frames, dt, time: app.time };
   };
-  globalThis.__aureliaRender = () => app.render();
-  return pending;
+  // Paints on demand and hands the canvas back as base64 PNG, so a check can
+  // compare a frame against a repainting of itself without a second page.
+  globalThis.__aureliaRender = (options = {}) => {
+    app.render({
+      withoutStrings: options.strings === false,
+      snapshot: options.snapshot ?? null,
+      hideRipples: options.hideRipples === true,
+    });
+    return app.canvas.toDataURL('image/png').slice('data:image/png;base64,'.length);
+  };
+  if (quiet) app.stopAnimation();
 }
 
 function boot() {
@@ -49,7 +63,7 @@ function boot() {
     reducedMotion: overrides.reducedMotion || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   });
   app.start();
-  if (overrides.quiet) installScriptedFrameLoop(app);
+  installDeterministicStepping(app, { quiet: overrides.quiet });
 
   const learn = document.querySelector('#learn');
   const dismissLearn = () => {
@@ -57,7 +71,11 @@ function boot() {
     learn.classList.add('dismissed');
     window.setTimeout(() => learn.setAttribute('hidden', ''), 460);
   };
-  canvas.addEventListener('pointerdown', dismissLearn, { once: false });
+  // Dismissed once the player has actually made something, not on any touch.
+  // A tap that mutes a string, or a drag that misses, leaves the instructions
+  // where they can still be read; the first new string is the moment they stop
+  // being needed. The app calls this through `onFirstTouch`.
+  app.onFirstTouch = dismissLearn;
   window.addEventListener('keydown', dismissLearn, { once: true });
 
   const readout = document.querySelector('#readout-detail');
@@ -85,6 +103,7 @@ function boot() {
 
   globalThis.__aurelia = {
     app,
+    step: (frames, dt) => globalThis.__aureliaStep(frames, dt),
     state: () => ({ ...app.state }),
     strings: () =>
       app.instrument.strings.map((line) => ({
