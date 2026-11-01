@@ -20,6 +20,8 @@
   --gutter: max(var(--pad), env(safe-area-inset-left));
 }
 
+/* __FONT_FACE__ */
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -28,7 +30,8 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--ink);
-  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, "DejaVu Sans", sans-serif;
+  /* Embedded by the build, not a system font: see fontFaceCss in tools/build-lib.mjs. */
+  font-family: "Aurelia Sans", sans-serif;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }
@@ -250,7 +253,7 @@ html, body {
   border-radius: 5px;
   border: 1px solid var(--panel-border);
   background: rgba(255, 255, 255, 0.07);
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, "DejaVu Sans Mono", monospace;
   font-size: 11px;
 }
 
@@ -320,6 +323,34 @@ html, body {
   #meters .meter { min-width: 46px; padding: 5px 8px; }
   #meters .meter .label { font-size: 8px; letter-spacing: 0.1em; }
   #meters .meter .value { font-size: 14px; }
+
+  /*
+   * Room for the bottom row.
+   *
+   * The buttons are anchored bottom-left and the disclosure bottom-right, with
+   * nothing between them, so they collide as soon as their combined width
+   * exceeds the screen. Measured on this face at the collapsed summary's natural
+   * 157px: two buttons at the 96px minimum plus the 10px gap need 371px, which
+   * is 17px more than a 390px screen and 47px more than a 360px one. The
+   * disclosure's border drew through the word "Clear".
+   *
+   * The buttons give width, not height: min-width 96px is a choice, 44px is a
+   * finger, and shrinking height is what would hurt. At a 72px floor with 9px of
+   * side padding the widest label ("Sound on") sets 100px wide, the row needs
+   * 337px, and that fits a 360px screen with 23px to spare.
+   */
+  #controls { gap: 6px; }
+  #controls button { min-width: 72px; padding: 0 9px; }
+}
+
+/*
+ * 360px is the narrowest phone still in wide use, and it is 5px short even with
+ * the sizing above, because the "Sound on" label will not set narrower than the
+ * text itself. Dropping the button label by half a point buys the 10px that
+ * clears the row without touching height or the 44px target.
+ */
+@media (orientation: portrait) and (max-width: 380px) {
+  #controls button { font-size: 13px; padding: 0 7px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -129,6 +129,51 @@ test('the page is viewport-ready and touch-friendly as served', async () => {
   assert.match(html, /env\(safe-area-inset-/, 'notches and gesture bars need inset handling');
 });
 
+test('the artifact embeds its own font rather than borrowing the host\u2019s', async () => {
+  const html = (await rebuild()).toString('utf8');
+
+  // Every face must be a data: URL. This is the property that CI broke: the
+  // sheet asked for `ui-sans-serif, system-ui`, which fontconfig answered
+  // differently on the CI runner than on a dev machine, so every line of text
+  // moved and all 18 goldens failed on images that looked identical by eye.
+  const faces = html.match(/@font-face\s*{[^}]*}/g) ?? [];
+  assert.equal(faces.length, 2, 'expected an embedded regular and bold face');
+  for (const face of faces) {
+    const src = /src:\s*url\(([^)]*)\)/.exec(face);
+    assert.ok(src, `an @font-face rule has no src: ${face.slice(0, 60)}`);
+    assert.match(
+      src[1],
+      /^data:font\/woff2;base64,[A-Za-z0-9+/]{500,}={0,2}$/,
+      'faces must be inline base64 WOFF2, not a reference to a file or a URL',
+    );
+  }
+
+  // Both weights must exist. The sheet asks for 550-700, and without a real
+  // bold face the browser synthesises one whose stem weight varies by engine,
+  // which reintroduces exactly the cross-machine drift embedding removed.
+  const weights = faces.map((face) => Number(/font-weight:\s*(\d+)/.exec(face)[1]));
+  assert.deepEqual(weights.sort((a, b) => a - b), [400, 700]);
+
+  // The stylesheet must actually select the embedded family, and must not fall
+  // back to a system stack that would be used the moment the face is rejected.
+  const bodyFamily = /\n\s*font-family:\s*([^;]*);/.exec(html);
+  assert.ok(bodyFamily, 'no font-family declaration found');
+  assert.match(bodyFamily[1], /^"Aurelia Sans"/);
+
+  // The canvas sets its own font string, separately from CSS. If the two ever
+  // disagree the panels and the canvas render in different faces, and only a
+  // screenshot would show it.
+  const app = readFileSync(join(ROOT, 'src', 'app.js'), 'utf8');
+  const stack = /const FONT_STACK = '([^']*)';/.exec(app);
+  assert.ok(stack, 'src/app.js must define FONT_STACK for canvas text');
+  assert.match(stack[1], /^"Aurelia Sans"/, 'canvas and CSS must name the same family');
+  assert.equal(
+    (html.match(/Aurelia Sans/g) ?? []).length >= 4,
+    true,
+    'the embedded family should appear in the faces, the stylesheet and the bundle',
+  );
+});
+
 test('every control is large enough for a finger', () => {
   const css = readFileSync(join(ROOT, 'src', 'styles.css'), 'utf8');
   // Every interactive control, not just the two buttons: the About disclosure is

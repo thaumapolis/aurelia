@@ -13,6 +13,17 @@
 
 import { Instrument, Phase, Proximity, clamp, MIN_LENGTH_PX, DISPLACEMENT_CLAMP, PITCH_ANCHOR_HZ, PITCH_REFERENCE_PX } from './sim.js';
 import { AudioEngine } from './audio.js';
+/**
+ * The font the canvas draws its own labels with.
+ *
+ * The family name must match the `@font-face` rules the build inlines into
+ * the stylesheet, so canvas text and panel text are set in the same embedded
+ * face. Repeating `ui-sans-serif, system-ui, ...` here instead would hand the
+ * choice back to the host: the panels and the canvas would disagree, and the
+ * same artifact would render differently on another machine. See fontFaceCss
+ * in tools/build-lib.mjs for the faces themselves.
+ */
+const FONT_STACK = '"Aurelia Sans", sans-serif';
 
 /** What a finger resting on a string is currently doing to it. */
 export const TouchMode = {
@@ -1271,7 +1282,7 @@ export class App {
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = `600 11px ${FONT_STACK}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('MUTE', point.x, point.y);
@@ -1297,13 +1308,13 @@ export class App {
     if (draft.crossing) {
       ctx.save();
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+      ctx.font = `600 13px ${FONT_STACK}`;
       ctx.fillText('crossing: becomes an ordered voice', draft.x1 + 12, draft.y1 - 10);
       ctx.restore();
     } else if (!short) {
       ctx.save();
       ctx.fillStyle = 'rgba(220,230,255,0.75)';
-      ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+      ctx.font = `600 13px ${FONT_STACK}`;
       ctx.fillText(`~${Math.round(this._pitchForLength(length))} Hz`, draft.x1 + 12, draft.y1 - 10);
       ctx.restore();
     }
