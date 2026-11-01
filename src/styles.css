@@ -217,12 +217,6 @@ html, body {
    * `#controls button` sizing rule did not cover and the test that reads that
    * rule did not catch - the one control a new visitor most needs to hit was
    * the hardest to aim at.
-   */
-  /*
-   * A touch target, like the buttons beside it. It was 24px, which the
-   * `#controls button` sizing rule did not cover and the test that reads that
-   * rule did not catch - the one control a new visitor most needs to hit was
-   * the hardest to aim at.
    *
    * `list-item`, not flexbox: a flex container draws no `::marker`, and the
    * triangle is the only cue that this label opens something.

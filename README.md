@@ -1,0 +1,85 @@
+# Aurelia
+
+An instrument you draw with your finger. Every line you stretch across the screen becomes a real wave simulation - a thread pinned at both ends, integrated in real time - and the shape you leave in it is the sound you hear.
+
+**[Open `index.html`](index.html)** in any modern browser. It is a single self-contained file with no network access, no build step, and no storage, so it also works inside a sandboxed `iframe` and offline from a local copy.
+
+![Aurelia on a desktop, mid-bow](docs/screens/desktop-bowed.png)
+
+## What you are looking at
+
+The canvas is a field of strings. Each one vibrates according to a wave equation, so a pluck travels out to the pinned ends, reflects, and interferes with itself; that interference is what you hear as a pitch. Three numbers in the corner tell you what the instrument is doing: how many strings exist, how many are still ringing, and the pitch of the one you last touched.
+
+There is nothing to configure. The app explains itself on screen and gets out of the way:
+
+- **Drag on empty space** to stretch a new string. Longer makes it lower - halve the length and the pitch rises an octave, and the readout counts it as it happens.
+- **Drag across a string** to pluck it. Rub along its length to bow it and hold it sustained; press and hold still to mute it.
+- **Drag a bright endpoint** to retune that string while it rings.
+
+The three verbs are listed in a panel on first load. It disappears once you make your first string, because after that the status line - `bowing ~163 Hz - keep rubbing to sustain`, `retuning 183 Hz -> 188 Hz` - is more useful than instructions. `HOW IT WORKS` in the corner holds the longer explanation, including why nearby strings drift in and out of phase.
+
+## Controls
+
+| Input | Result |
+| --- | --- |
+| Drag on empty space | New string; length sets the pitch |
+| Drag across a string | Pluck |
+| Rub along a string | Bow, sustained while you keep moving |
+| Hold still on a string | Mute it |
+| Drag an endpoint | Retune while it rings |
+| `C` / `Z` / `M` / `D` | Clear, undo, mute, reset the demo instrument |
+| `Sound on` / `Clear` | Toggle audio, empty the canvas |
+
+Sound starts on your first touch, because browsers require a user gesture before any audio may play.
+
+The layout is computed, not fixed, and it is tested at three viewports. On a phone in portrait the seeded instrument sits below the instruction panel rather than behind it; in landscape the panel collapses to the three verbs and keeps its own strip clear of the status line.
+
+![Portrait phone, first screen](docs/screens/phone-portrait-onboarding.png)
+![Landscape phone, first screen](docs/screens/phone-landscape-onboarding.png)
+
+## Running it
+
+Open `index.html`. That is all - there is no server and no install. To edit it, change the files in `src/` and rebuild the artifact:
+
+```sh
+node tools/build.mjs          # writes index.html from src/
+```
+
+`src/` is split into the wave simulation (`sim.js`), the audio graph (`audio.js`), the app and layout (`app.js`), and the boot wiring (`boot.js`); `tools/build-lib.mjs` inlines them into one file and refuses to emit a bundle with a duplicate top-level binding.
+
+## Checks
+
+The reproducible toolchain is in `shell.nix` - Node, Playwright and its browsers, and a defined font set so text in golden images means the same thing on every machine.
+
+```sh
+nix-shell shell.nix --run ./check.sh
+```
+
+`check.sh` runs four phases and treats any phase it cannot run as a failure rather than a skip, because a script that prints `ALL CHECKS PASSED` after painting nothing is worse than one that errors:
+
+1. **Build** the artifact, so tests never run against a stale `index.html`.
+2. **Syntax** - parse every source, tool and test file.
+3. **51 unit and interaction tests** - the wave physics, and the gestures: pluck versus bow versus mute, retuning, undo, cancelled pointers, multi-touch.
+4. **18 golden screenshots** - three viewports by six states, compared against committed baselines.
+
+The goldens are deterministic: a `?quiet=1` parameter hands the clock to the harness so frame *N* means the same thing on every run, and every scene reproduces at 0.000% difference. Regenerate them with:
+
+```sh
+node tests/golden.test.mjs --update     # after looking at every new baseline
+```
+
+### Which browser the screenshots use
+
+`DEFAULT_ENGINE` is **Firefox**, and that is a constraint of the environment rather than a preference. In the sandbox these checks run in, Chromium dies before it paints (SIGTRAP at `sandbox_host_linux.cc:41`, and crashpad `setsockopt: Operation not permitted`) even with `--no-sandbox`, and WebKit aborts at `Failed to adopt IPC::Connection socket`. Firefox needs none of the syscalls they want.
+
+`--engine chromium` and `--engine webkit` are still available and fail loudly if the browser cannot start, rather than falling back to Firefox and reporting that they tested something they did not. **The committed baselines were produced by Firefox and are expected to differ in font rasterisation and anti-aliasing under another engine.** On a normal workstation all three should render; only Firefox is verified here.
+
+## CI
+
+`.github/workflows/check.yml` runs the same `./check.sh` inside the same `nix-shell`, so CI is not a second definition of correct. It is not enabled for a remote yet - see the note in that file.
+
+## Known limits
+
+- Strings you draw go exactly where you draw them, including under the buttons; the layout rules only place the seeded instrument.
+- The goldens are verified on Firefox only, for the reason above.
+- Sound needs a browser gesture, so the first interaction is silent by design.

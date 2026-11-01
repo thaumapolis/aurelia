@@ -221,7 +221,25 @@ html, body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
-  min-height: 24px;
+  /*
+   * A touch target, like the buttons beside it. It was 24px, which the
+   * `#controls button` sizing rule did not cover and the test that reads that
+   * rule did not catch - the one control a new visitor most needs to hit was
+   * the hardest to aim at.
+   *
+   * `list-item`, not flexbox: a flex container draws no `::marker`, and the
+   * triangle is the only cue that this label opens something.
+   *
+   * The height is bought with negative margin rather than left to grow the
+   * panel. `#about` is bottom-anchored, and the app measures it to decide where
+   * the instrument may go, so making the summary taller in layout terms costs
+   * 20px of string on every viewport. Padding down and pulling the box back up
+   * by the same amount gives the finger 44px and the layout back its 20.
+   */
+  min-height: 44px;
+  display: list-item;
+  padding: 10px 0;
+  margin: -10px 0;
 }
 
 #about .about-body {
@@ -2196,6 +2214,11 @@ class App {
       const line = this.instrument.add(row.left, row.y, row.right, row.y);
       if (line) line.pluck(0.3 + line.id * 0.09, 1.25, 1);
     }
+    // Seeding changes the instrument, so the counts have to be retaken here.
+    // They are otherwise the initial zeros until the first frame runs, which
+    // leaves the page saying `strings 0` and "drag anywhere to stretch your
+    // first string" over a stage that already has four.
+    this._publishState();
     this._setState({ hint: 'first-touch' });
   }
 
@@ -2697,20 +2720,30 @@ function boot() {
     pitch: document.querySelector('#m-pitch'),
   };
   let previous = '';
-  const paint = () => {
+  /** Copy the app's state onto the page. Returns whether anything changed. */
+  const sync = () => {
     const state = app.state;
     const detail = state.detail || defaultDetail(state);
     const pitch = state.pitchHz ? `${Math.round(state.pitchHz)} Hz` : '-';
     const signature = `${detail}|${state.strings}|${state.sounding}|${pitch}`;
-    if (signature !== previous) {
-      previous = signature;
-      if (readout) readout.textContent = detail;
-      if (meters.strings) meters.strings.textContent = String(state.strings);
-      if (meters.ringing) meters.ringing.textContent = String(state.sounding);
-      if (meters.pitch) meters.pitch.textContent = pitch;
-    }
+    if (signature === previous) return false;
+    previous = signature;
+    if (readout) readout.textContent = detail;
+    if (meters.strings) meters.strings.textContent = String(state.strings);
+    if (meters.ringing) meters.ringing.textContent = String(state.sounding);
+    if (meters.pitch) meters.pitch.textContent = pitch;
+    return true;
+  };
+  const paint = () => {
+    sync();
     requestAnimationFrame(paint);
   };
+  // Painted once before the loop starts. The seeded instrument exists by now,
+  // so without this the page shows an empty stage's numbers - `strings 0`, and
+  // "Drag anywhere to stretch your first string" over four strings - until the
+  // first animation frame arrives. That is about 16ms on a focused tab, and
+  // indefinite in a background one or under a browser that defers rAF.
+  sync();
   requestAnimationFrame(paint);
 
   globalThis.__aurelia = {
