@@ -11,7 +11,7 @@ report() { printf '\n== %s ==\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; STATUS=1; }
 
 if [[ -z $NODE ]]; then
-  fail "node is not on PATH. Run inside the project shell: nix-shell shell.nix --run ./check.sh"
+  fail "node is not on PATH. Run inside the project shell: nix develop --command ./check.sh"
   exit $STATUS
 fi
 
@@ -96,7 +96,7 @@ if [[ -n ${PLAYWRIGHT_ENTRY:-} && -n ${PLAYWRIGHT_BROWSERS_PATH:-} ]]; then
     fail "golden screenshot comparison failed"
   fi
 else
-  fail "browser toolchain is not configured (PLAYWRIGHT_ENTRY / PLAYWRIGHT_BROWSERS_PATH unset), so no page was painted. Run: nix-shell shell.nix --run ./check.sh"
+  fail "browser toolchain is not configured (PLAYWRIGHT_ENTRY / PLAYWRIGHT_BROWSERS_PATH unset), so no page was painted. Run: nix develop --command ./check.sh"
 fi
 
 printf '\n'

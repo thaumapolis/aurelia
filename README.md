@@ -49,18 +49,20 @@ node tools/build.mjs          # writes index.html from src/
 
 ## Checks
 
-The reproducible toolchain is in `shell.nix` - Node, Playwright and its browsers, and a defined font set so text in golden images means the same thing on every machine.
+The toolchain is pinned in `flake.nix` and `flake.lock` - Node, Playwright and its browsers - so a fresh machine and CI resolve exactly the same versions and no golden image can be repainted by a nixpkgs bump. Either form works:
 
 ```sh
-nix-shell shell.nix --run ./check.sh
+nix develop --command ./check.sh      # flake-native
+nix-shell shell.nix --run ./check.sh  # same shell, pre-flake entry point
 ```
 
-`check.sh` runs four phases and treats any phase it cannot run as a failure rather than a skip, because a script that prints `ALL CHECKS PASSED` after painting nothing is worse than one that errors:
+`check.sh` runs five phases and treats any phase it cannot run as a failure rather than a skip, because a script that prints `ALL CHECKS PASSED` after painting nothing is worse than one that errors:
 
 1. **Build** the artifact, so tests never run against a stale `index.html`.
 2. **Syntax** - parse every source, tool and test file.
 3. **51 unit and interaction tests** - the wave physics, and the gestures: pluck versus bow versus mute, retuning, undo, cancelled pointers, multi-touch.
-4. **18 golden screenshots** - three viewports by six states, compared against committed baselines.
+4. **Engine coverage** - boot and play the instrument in Firefox and Chromium, asserting the strings are visible and no page error or network request occurs.
+5. **18 golden screenshots** - three viewports by six states, compared against committed baselines.
 
 The goldens are deterministic: a `?quiet=1` parameter hands the clock to the harness so frame *N* means the same thing on every run, and every scene reproduces at 0.000% difference. Regenerate them with:
 
@@ -76,10 +78,10 @@ node tests/golden.test.mjs --update     # after looking at every new baseline
 
 ## CI
 
-`.github/workflows/check.yml` runs the same `./check.sh` inside the same `nix-shell`, so CI is not a second definition of correct. It is not enabled for a remote yet - see the note in that file.
+`.github/workflows/check.yml` runs the same `./check.sh` in the same pinned shell, so CI is not a second definition of correct. It runs on pushes and pull requests to `main`.
 
 ## Known limits
 
 - Strings you draw go exactly where you draw them, including under the buttons; the layout rules only place the seeded instrument.
-- The goldens are verified on Firefox only, for the reason above.
+- The goldens are verified on Firefox only, for the reason above. Chromium is covered by a behavioural smoke test rather than by pixels, and it has never run anywhere yet: the engine test was written in an environment where Chromium cannot start, so CI is its first execution.
 - Sound needs a browser gesture, so the first interaction is silent by design.

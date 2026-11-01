@@ -1,11 +1,10 @@
-# The same command as local development: nix-shell shell.nix --run ./check.sh.
-# This is deliberately not a second recipe with node and playwright installed by
-# hand - a CI that defines correct differently from the local shell is a CI that
-# drifts.
+# The same command as local development, in the same pinned toolchain. This is
+# deliberately not a second recipe with node and playwright installed by hand:
+# a CI that defines correct differently from the local shell is a CI that drifts.
 #
-# NOT ENABLED: this project has no designated remote repository yet, so pushing
-# it is an operator action. Once a remote exists, this workflow runs on pushes and
-# pull requests to main.
+# The flake is what makes that reproducible. flake.lock pins nixpkgs to one
+# commit, so CI cannot pick up a new node or Playwright and silently repaint the
+# golden screenshots differently from every other machine.
 name: check
 
 on:
@@ -17,22 +16,28 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - uses: cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@V29
         with:
-          nix_path: nixpkgs=channel:nixos-25.05
+          # No nix_path: the flake is the input, and its lock file decides what
+          # nixpkgs means. Pointing NIX_PATH somewhere else would let the
+          # workflow resolve a different nixpkgs from the one being tested.
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
-      # Build, syntax, 51 tests, and 18 golden screenshots. Exits non-zero if any
-      # phase cannot run, so a missing browser or a missing baseline is a red
-      # build rather than a green one that checked nothing.
+      # Checks out nothing extra and installs nothing outside the lock: build,
+      # syntax, unit and interaction tests, engine coverage, and 18 golden
+      # screenshots. Exits non-zero if any phase cannot run, so a missing browser
+      # or a missing baseline is a red build rather than a green one that checked
+      # nothing.
       - name: Run the acceptance checklist
-        run: nix-shell shell.nix --run ./check.sh
+        run: nix develop --command ./check.sh
 
-      # On failure the frames CI saw are the difference between "the layout moved"
-      # and "the font changed", so keep them.
+      # On failure, the frames CI saw are the difference between "the layout
+      # moved" and "the font changed", so keep them.
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
