@@ -35,20 +35,29 @@ async function rebuild() {
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
+/**
+ * The artifact as the repository holds it, read once at load time.
+ *
+ * It has to be captured before any test runs, because `rebuild()` writes
+ * index.html: a staleness check that reads the file afterwards compares fresh
+ * bytes against fresh bytes and can never fail. That is not a hypothetical - the
+ * first version of this check passed while index.html was genuinely stale.
+ */
+const AS_COMMITTED = existsSync(ARTIFACT) ? readFileSync(ARTIFACT) : null;
+
 test('the artifact is regenerated from src/ before anything else is asserted', async () => {
   const bytes = await rebuild();
   assert.ok(bytes.length > 10_000, `artifact looks truncated: ${bytes.length} bytes`);
 });
 
 test('the committed artifact matches what src/ produces', async () => {
-  // Reading the file first, then rebuilding, is the check: if the two differ the
-  // repository was committed with a stale index.html and every screenshot taken
-  // since then was of the wrong page.
-  const onDisk = readFileSync(ARTIFACT);
+  // If these differ, the repository was committed with a stale index.html and
+  // every screenshot taken since then was of the wrong page.
+  assert.ok(AS_COMMITTED !== null, `there is no ${ARTIFACT} to check; run node tools/build.mjs`);
   const builder = await import(pathToFileURL(join(ROOT, 'tools', 'build-lib.mjs')).href);
   const fresh = Buffer.from(builder.buildArtifact(ROOT), 'utf8');
   assert.equal(
-    sha256(onDisk),
+    sha256(AS_COMMITTED),
     sha256(fresh),
     'index.html is stale: run node tools/build.mjs and commit the result',
   );
