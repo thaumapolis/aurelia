@@ -109,12 +109,68 @@ export function createUi() {
     },
   });
   const buttons = { mute: make('mute'), clear: make('clear'), audio: make('audio') };
+  // Overlay panels with geometry roughly matching the real CSS on the viewport
+  // the harness boots at. The app measures these to decide where the instrument
+  // may go, so a stub that reports nothing at all would let it be laid out over
+  // the entire canvas and pass here while sitting under a panel in a browser.
+  // The rectangle is reported from the node's own fields, so a test can move a
+  // panel by assigning to it - which is how a viewport other than the one this
+  // stub was drawn for, or a lesson the player has dismissed, gets simulated.
+  const panel = (rect) => ({
+    ...rect,
+    getBoundingClientRect() {
+      return {
+        left: this.left,
+        top: this.top,
+        width: this.width,
+        height: this.height,
+        right: this.left + this.width,
+        bottom: this.top + this.height,
+      };
+    },
+    hidden: false,
+  });
+  const overlays = new Map([
+    ['#brand', panel({ left: 18, top: 18, width: 260, height: 46, right: 278, bottom: 64 })],
+    ['#meters', panel({ left: 1000, top: 18, width: 262, height: 48, right: 1262, bottom: 66 })],
+    ['#readout', panel({ left: 18, top: 690, width: 400, height: 20, right: 418, bottom: 710 })],
+    ['#controls', panel({ left: 18, top: 730, width: 240, height: 44, right: 258, bottom: 774 })],
+    ['#about', panel({ left: 1120, top: 730, width: 142, height: 44, right: 1262, bottom: 774 })],
+    ['#learn', panel({ left: 18, top: 74, width: 400, height: 300, right: 418, bottom: 374 })],
+  ]);
+  // Only the ids this stub knows about, and an optional `:not([hidden])`
+  // suffix, which resolves against the node's own `hidden` flag so the app can
+  // ask "is the lesson still up?" without a stylesheet. A comma-separated
+  // selector is resolved part by part, which is all the app ever asks for.
+  const resolve = (part) => {
+    const trimmed = part.trim();
+    const action = /^\[data-action=(\w+)\]$/.exec(trimmed);
+    if (action) return buttons[action[1]] ?? null;
+    const [id, filter] = trimmed.split(':not(');
+    const node = overlays.get(id.trim()) ?? null;
+    if (filter !== undefined && trimmed.includes(':not([hidden])')) return node && !node.hidden ? node : null;
+    return node;
+  };
+  const bySelector = (selector) => {
+    for (const part of selector.split(',')) {
+      const found = resolve(part);
+      if (found) return found;
+    }
+    return null;
+  };
   return {
     buttons,
-    querySelector(selector) {
-      const match = /^\[data-action=(\w+)\]$/.exec(selector);
-      if (match) return buttons[match[1]] ?? null;
-      return null;
+    overlays,
+    querySelector: bySelector,
+    // Only real panels are listed, so `#learn:not([hidden])` resolves against
+    // the stub's own `hidden` flag rather than matching everything.
+    querySelectorAll(selector) {
+      const found = [];
+      for (const part of selector.split(',')) {
+        const node = resolve(part);
+        if (node) found.push(node);
+      }
+      return found;
     },
   };
 }

@@ -37,25 +37,67 @@ function dependencyOrder(entry) {
   return order;
 }
 
+/** Top-level `const`/`let`/`class` names a module declares, for collision checks. */
+function topLevelNames(source) {
+  const names = new Set();
+  const patterns = [
+    /^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)/gm,
+    /^(?:export\s+)?let\s+([A-Za-z_$][\w$]*)/gm,
+    /^(?:export\s+)?class\s+([A-Za-z_$][\w$]*)/gm,
+    /^(?:export\s+)?function\s+([A-Za-z_$][\w$]*)/gm,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) names.add(match[1]);
+  }
+  return names;
+}
+
+/**
+ * Reject two modules declaring the same top-level binding.
+ *
+ * Sharing one scope is what makes cross-module references work, and the cost of
+ * that choice is that a duplicate becomes a hard error. Detecting it here, with
+ * both filenames, is the whole reason not to hand-write the concatenation: the
+ * alternative is a bundle that parses and then does something quietly wrong.
+ */
+function assertNoCollisions(modules) {
+  const seen = new Map();
+  for (const { file, source } of modules) {
+    for (const name of topLevelNames(source)) {
+      if (seen.has(name)) {
+        throw new Error(`duplicate top-level binding "${name}" in ${seen.get(name)} and ${file}`);
+      }
+      seen.set(name, file);
+    }
+  }
+}
+
 /** Strip ESM syntax so a set of module files can run as one classic script. */
 function stripModuleSyntax(source, file) {
   const stripped = source
     .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, '')
-    .replace(/^export\s+(?=class|function|const|let|var|enum)/gm, '');
+    .replace(/^export\s+(?=class|function\s+(?:async\s+)?|const\s|let\s|var\s|async\s+function\s)/gm, '')
+    .replace(/^export\s*\{[^}]*\};?\s*$/gm, '');
   const leftover = stripped.match(/^\s*(import|export)\b.*$/m);
   if (leftover) throw new Error(`${file}: unbundler left ${leftover[0].trim().slice(0, 60)}`);
   return stripped;
 }
 
 function bundleModules(entry) {
-  const parts = dependencyOrder(entry).map((file) => {
+  const files = dependencyOrder(entry);
+  const modules = files.map((file) => ({ file, source: readFileSync(file, 'utf8') }));
+  assertNoCollisions(modules);
+  const parts = modules.map(({ file, source }) => {
     const label = file.startsWith(ROOT) ? file.slice(ROOT.length + 1) : file;
-    return `/* ${label} */\n${stripModuleSyntax(readFileSync(file, 'utf8'), file)}`;
+    return `/* --- ${label} --- */\n${stripModuleSyntax(source, file)}`;
   });
-  // One function scope per module: an IIFE's top level is private, which is how
-  // the bundle keeps each module's module-private `const clamp` from colliding.
-  const scoped = parts.map((part) => `(function () {\n${part}\n})();`);
-  return `'use strict';\n${scoped.join('\n\n')}\n`;
+  // A single function scope for the whole bundle, not one per module. ESM gives
+  // every module its own scope *and* sees the bindings its imports export; one
+  // shared function scope reproduces the first property and, because modules are
+  // concatenated in dependency order, reproduces the second for the
+  // function-call-time references this codebase actually makes. Separate IIFEs
+  // per module would look tidier and silently produce "App is not defined".
+  return `(function () {\n'use strict';\n${parts.join('\n\n')}\n})();\n`;
 }
 
 /**
