@@ -243,25 +243,65 @@ html, body {
 @media (orientation: landscape) and (max-height: 520px) {
   :root { --pad: 12px; }
   #brand h1 { font-size: 17px; }
+  /*
+   * In landscape there is rarely enough height for a paragraph of instructions
+   * and an instrument you can actually play, so the lesson collapses to the
+   * three verbs. The "why" paragraph stays available under HOW IT WORKS, which
+   * is where someone who wants the physics will look anyway.
+   */
+  #brand p { display: none; }
   #learn {
+    /*
+     * Landscape is height-starved: on a 390px-tall screen a lesson this wordy
+     * and an instrument this playable cannot both have the room they need. The
+     * lesson yields, because it is the thing the player is done with - it is
+     * clamped to a quarter of the screen and scrolls, which keeps a legible
+     * summary in view without letting three paragraphs eat the instrument. The
+     * full explanation is one tap away under HOW IT WORKS.
+     */
     top: auto;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+    /*
+     * The readout sits above the buttons, and the lesson above the readout.
+     * They used to share a band and print on top of each other; each now owns
+     * its own strip, measured from the same insets the readout and buttons use.
+     */
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
     left: var(--gutter);
-    width: min(360px, 44vw);
-    padding: 11px 13px;
+    right: var(--gutter);
+    width: auto;
+    max-width: 620px;
+    padding: 8px 14px;
   }
-  #learn li { font-size: 12px; margin-bottom: 4px; }
   #learn .why { display: none; }
+  #learn h2 { margin-bottom: 4px; }
+  #learn ol { padding-left: 18px; }
+  /*
+   * Small enough that all three verbs fit without the panel being clamped and
+   * scrolled. Clamping hid item 3 - "drag a bright endpoint to retune", one of
+   * the three things the panel exists to teach - behind an undiscoverable
+   * scroll on the one screen where it is tallest.
+   */
+  #learn li { margin-bottom: 1px; font-size: 11px; line-height: 1.28; overflow-wrap: anywhere; }
   #readout { bottom: calc(env(safe-area-inset-bottom, 0px) + 62px); font-size: 12px; }
   #controls button { min-height: 44px; min-width: 84px; font-size: 12.5px; }
   #about { max-width: 30vw; }
 }
 
-/* Narrow portrait phones: keep the lesson readable but out of the way. */
-@media (orientation: portrait) and (max-width: 420px) {
+/*
+ * Narrow portrait phones: ~390px wide, which is not enough room to set the
+ * wordmark and the three meters side by side - the subtitle ran straight
+ * through the "strings" and "ringing" cards. The brand gives up its subtitle
+ * (the readout line says as much, in the player's own language) and the meters
+ * give up width.
+ */
+@media (orientation: portrait) and (max-width: 500px) {
+  #brand p { display: none; }
   #learn { width: calc(100vw - 2 * var(--gutter)); padding: 13px 15px; }
   #learn li { font-size: 13px; }
-  #meters .meter { min-width: 50px; padding: 5px 8px; }
+  #meters { gap: 6px; }
+  #meters .meter { min-width: 46px; padding: 5px 8px; }
+  #meters .meter .label { font-size: 8px; letter-spacing: 0.1em; }
+  #meters .meter .value { font-size: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
