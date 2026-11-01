@@ -122,11 +122,18 @@ test('the page is viewport-ready and touch-friendly as served', async () => {
 
 test('every control is large enough for a finger', () => {
   const css = readFileSync(join(ROOT, 'src', 'styles.css'), 'utf8');
-  const block = /#controls button\s*{([^}]*)}/.exec(css);
-  assert.ok(block, 'the control styling should be findable by this test');
-  const rules = block[1];
-  const minHeight = Number(/min-height:\s*(\d+)px/.exec(rules)[1]);
-  const minWidth = Number(/min-width:\s*(\d+)px/.exec(rules)[1]);
-  assert.ok(minHeight >= 44, `touch targets must be at least 44px, got ${minHeight}px`);
-  assert.ok(minWidth >= 44, `touch targets must be at least 44px, got ${minWidth}px`);
+  // Every interactive control, not just the two buttons: the About disclosure is
+  // a touch target too, and reading only `#controls button` is what let it ship
+  // at 24px while this test was green.
+  const selectors = ['#controls button', '#about summary'];
+  for (const selector of selectors) {
+    const block = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*{([^}]*)}`).exec(css);
+    assert.ok(block, `the styling for ${selector} should be findable by this test`);
+    const rules = block[1];
+    const minHeight = Number(/min-height:\s*(\d+)px/.exec(rules)[1]);
+    assert.ok(minHeight >= 44, `${selector} must be at least 44px tall, got ${minHeight}px`);
+  }
+  const buttons = /#controls button\s*{([^}]*)}/.exec(css)[1];
+  const minWidth = Number(/min-width:\s*(\d+)px/.exec(buttons)[1]);
+  assert.ok(minWidth >= 44, `touch targets must be at least 44px wide, got ${minWidth}px`);
 });

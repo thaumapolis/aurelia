@@ -212,7 +212,31 @@ html, body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
-  min-height: 24px;
+  /*
+   * A touch target, like the buttons beside it. It was 24px, which the
+   * `#controls button` sizing rule did not cover and the test that reads that
+   * rule did not catch - the one control a new visitor most needs to hit was
+   * the hardest to aim at.
+   */
+  /*
+   * A touch target, like the buttons beside it. It was 24px, which the
+   * `#controls button` sizing rule did not cover and the test that reads that
+   * rule did not catch - the one control a new visitor most needs to hit was
+   * the hardest to aim at.
+   *
+   * `list-item`, not flexbox: a flex container draws no `::marker`, and the
+   * triangle is the only cue that this label opens something.
+   *
+   * The height is bought with negative margin rather than left to grow the
+   * panel. `#about` is bottom-anchored, and the app measures it to decide where
+   * the instrument may go, so making the summary taller in layout terms costs
+   * 20px of string on every viewport. Padding down and pulling the box back up
+   * by the same amount gives the finger 44px and the layout back its 20.
+   */
+  min-height: 44px;
+  display: list-item;
+  padding: 10px 0;
+  margin: -10px 0;
 }
 
 #about .about-body {
