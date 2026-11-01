@@ -15,8 +15,11 @@
  * (no browser binary) rather than on a guess about the host.
  */
 
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
 import { loadPlaywright, openScene, gesture, advance, releaseHeld, SCENES } from '../tools/browser.mjs';
 
@@ -132,6 +135,54 @@ for (const engineName of ENGINES) {
     } finally {
       // The finger comes up, but the browser stays open for the shared teardown.
       await releaseHeld(page);
+    }
+  });
+}
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ARTIFACT = join(ROOT, 'index.html');
+
+/**
+ * The bottom row must not collide, on every phone width the layout claims.
+ *
+ * #controls is anchored bottom-left and #about bottom-right, with nothing
+ * between them, so their combined width is what decides whether they overlap.
+ * Embedding a real bold face widened both labels and put the disclosure's
+ * border through the word "Clear" at 390px - which no screenshot baseline
+ * covered, because the goldens are compared against themselves.
+ */
+for (const [width, height] of [[360, 800], [390, 844], [430, 932]]) {
+  test(`${width}x${height}: the bottom controls do not overlap`, async () => {
+    const browser = await engines.firefox.launch();
+    open.push({ engineName: `footer-${width}`, browser });
+    const page = await browser.newPage({ viewport: { width, height } });
+    await page.goto(pathToFileURL(ARTIFACT).href + '?quiet=1');
+    await page.waitForFunction(() => window.__aurelia?.app);
+
+    const state = await page.evaluate(() => {
+      const rect = (sel) => {
+        const b = document.querySelector(sel).getBoundingClientRect();
+        return { left: b.left, right: b.right, top: b.top, bottom: b.bottom };
+      };
+      return {
+        controls: rect('#controls'),
+        about: rect('#about'),
+        readout: rect('#readout'),
+        vw: innerWidth,
+        vh: innerHeight,
+      };
+    });
+
+    const gap = state.about.left - state.controls.right;
+    assert.ok(
+      gap >= 0,
+      `#controls ends at ${state.controls.right.toFixed(0)}px but #about starts at ` +
+        `${state.about.left.toFixed(0)}px: they overlap by ${(-gap).toFixed(0)}px`,
+    );
+    for (const [name, box] of [['#controls', state.controls], ['#about', state.about]]) {
+      assert.ok(box.left >= 0 && box.right <= state.vw, `${name} overflows a ${width}px viewport`);
+      assert.ok(box.bottom - box.top >= 44, `${name} is under the 44px finger target`);
+      assert.ok(box.bottom <= state.vh, `${name} is pushed below the viewport`);
     }
   });
 }

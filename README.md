@@ -32,7 +32,7 @@ The three verbs are listed in a panel on first load. It disappears once you make
 
 Sound starts on your first touch, because browsers require a user gesture before any audio may play.
 
-The layout is computed, not fixed, and it is tested at three viewports. On a phone in portrait the seeded instrument sits below the instruction panel rather than behind it; in landscape the panel collapses to the three verbs and keeps its own strip clear of the status line.
+The layout is computed, not fixed, and it is tested at three viewports. On a phone in portrait the seeded instrument sits below the instruction panel rather than behind it; in landscape the panel collapses to the three verbs and keeps its own strip clear of the status line. The bottom row - `Sound on`, `Clear`, `HOW IT WORKS` - is checked for overlap at 360, 390 and 430px, because those controls are anchored to opposite corners with nothing between them, and a label that grows by a few pixels is enough to draw one control through another.
 
 ![Portrait phone, first screen](docs/screens/phone-portrait-onboarding.png)
 ![Landscape phone, first screen](docs/screens/phone-landscape-onboarding.png)
@@ -47,6 +47,16 @@ node tools/build.mjs          # writes index.html from src/
 
 `src/` is split into the wave simulation (`sim.js`), the audio graph (`audio.js`), the app and layout (`app.js`), and the boot wiring (`boot.js`); `tools/build-lib.mjs` inlines them into one file and refuses to emit a bundle with a duplicate top-level binding.
 
+### The font is embedded, and that is not optional
+
+The artifact ships its own font: DejaVu Sans Regular and Bold, subset to the characters the page can draw, base64-encoded as WOFF2 inside the stylesheet (~21 KiB). It asks for that face by one family name, `"Aurelia Sans"`, and never consults the host.
+
+This is a correctness requirement, not a preference. The sheet used to ask for `ui-sans-serif, system-ui, "Segoe UI", Roboto, "DejaVu Sans", sans-serif` - a font the project does not control. CI's Firefox and the developer shell resolved that stack to different faces, glyph advances drifted, every line of text fell out of alignment, and all 18 golden screenshots failed at 0.6-4.5% while looking identical to the eye. Embedding also keeps the offline promise honest: a font resolved through fontconfig is an external dependency.
+
+Both weights are embedded because the sheet asks for 550-700. Shipping only Regular would make the browser synthesise a fake bold whose stem weight varies per engine, which is the same cross-machine drift wearing a different hat. This is visible in the screenshots: the button labels and the `4 strings ringing` status are now set in a real bold.
+
+Regenerate the subsets with `./tools/with-fonttools.sh`, which takes `pyftsubset` and `woff2_compress` from the pinned nixpkgs. It is the only part of the project that wants network, and the output is committed so that building and testing need neither network nor font tooling. `tests/build.test.mjs` fails if the faces go missing, if a weight is dropped, or if the stylesheet reaches for a system stack again.
+
 ## Checks
 
 The toolchain is pinned in `flake.nix` and `flake.lock` - Node, Playwright and its browsers - so a fresh machine and CI resolve exactly the same versions and no golden image can be repainted by a nixpkgs bump. Either form works:
@@ -60,7 +70,7 @@ nix-shell shell.nix --run ./check.sh  # same shell, pre-flake entry point
 
 1. **Build** the artifact, so tests never run against a stale `index.html`.
 2. **Syntax** - parse every source, tool and test file.
-3. **51 unit and interaction tests** - the wave physics, and the gestures: pluck versus bow versus mute, retuning, undo, cancelled pointers, multi-touch.
+3. **53 unit and interaction tests** - the wave physics, the gestures (pluck versus bow versus mute, retuning, undo, cancelled pointers, multi-touch), and the artifact's own promises: no network, no storage, and a font it owns.
 4. **Engine coverage** - boot and play the instrument in Firefox and Chromium, asserting the strings are visible and no page error or network request occurs. This is behavioural, not pixel-based: a second engine differs in font rasterisation, so comparing it to the Firefox baselines would fail for reasons unrelated to the app. Narrow the list with `./check.sh --engines firefox` where an engine cannot start at all.
 5. **18 golden screenshots** - three viewports by six states, compared against committed baselines.
 
