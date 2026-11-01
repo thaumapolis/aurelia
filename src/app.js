@@ -977,6 +977,11 @@ export class App {
       const line = this.instrument.add(row.left, row.y, row.right, row.y);
       if (line) line.pluck(0.3 + line.id * 0.09, 1.25, 1);
     }
+    // Seeding changes the instrument, so the counts have to be retaken here.
+    // They are otherwise the initial zeros until the first frame runs, which
+    // leaves the page saying `strings 0` and "drag anywhere to stretch your
+    // first string" over a stage that already has four.
+    this._publishState();
     this._setState({ hint: 'first-touch' });
   }
 

@@ -439,3 +439,22 @@ test('a lesson the instrument cannot share is removed from the free area', () =>
   panel.hidden = true;
   assert.ok(app.freeArea().top < 386, 'a dismissed lesson must stop reserving space');
 });
+
+/**
+ * The page must never claim the stage is empty when it is not.
+ *
+ * The seeded instrument is created before the first frame runs, and the counts
+ * shown to the player used to come from state that only a frame refreshed - so
+ * the app opened saying `strings 0` and "Drag anywhere to stretch your first
+ * string" over four strings that were already ringing.
+ */
+test('the reported counts match the instrument before any frame runs', () => {
+  const { app } = bootApp();
+  assert.ok(app.instrument.count > 0, 'this check is about a seeded instrument');
+  assert.equal(
+    app.state.strings,
+    app.instrument.count,
+    'state.strings must already match the instrument, not wait for a frame',
+  );
+  assert.equal(app.state.sounding, app.instrument.count);
+});

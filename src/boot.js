@@ -85,20 +85,30 @@ function boot() {
     pitch: document.querySelector('#m-pitch'),
   };
   let previous = '';
-  const paint = () => {
+  /** Copy the app's state onto the page. Returns whether anything changed. */
+  const sync = () => {
     const state = app.state;
     const detail = state.detail || defaultDetail(state);
     const pitch = state.pitchHz ? `${Math.round(state.pitchHz)} Hz` : '-';
     const signature = `${detail}|${state.strings}|${state.sounding}|${pitch}`;
-    if (signature !== previous) {
-      previous = signature;
-      if (readout) readout.textContent = detail;
-      if (meters.strings) meters.strings.textContent = String(state.strings);
-      if (meters.ringing) meters.ringing.textContent = String(state.sounding);
-      if (meters.pitch) meters.pitch.textContent = pitch;
-    }
+    if (signature === previous) return false;
+    previous = signature;
+    if (readout) readout.textContent = detail;
+    if (meters.strings) meters.strings.textContent = String(state.strings);
+    if (meters.ringing) meters.ringing.textContent = String(state.sounding);
+    if (meters.pitch) meters.pitch.textContent = pitch;
+    return true;
+  };
+  const paint = () => {
+    sync();
     requestAnimationFrame(paint);
   };
+  // Painted once before the loop starts. The seeded instrument exists by now,
+  // so without this the page shows an empty stage's numbers - `strings 0`, and
+  // "Drag anywhere to stretch your first string" over four strings - until the
+  // first animation frame arrives. That is about 16ms on a focused tab, and
+  // indefinite in a background one or under a browser that defers rAF.
+  sync();
   requestAnimationFrame(paint);
 
   globalThis.__aurelia = {
