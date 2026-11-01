@@ -29,7 +29,12 @@
 
           env = {
             # ESM ignores NODE_PATH, so the driver is addressed by absolute path.
-            PLAYWRIGHT_ENTRY = "${pkgs.playwright-driver}/package/index.mjs";
+            #
+            # index.mjs, at the top level of the driver - not package/index.mjs.
+            # The `package/` prefix is how node2nix-style packages lay themselves
+            # out, and playwright-driver does not do that; guessing it produced an
+            # entry that resolved to nothing and only failed at import time.
+            PLAYWRIGHT_ENTRY = "${pkgs.playwright-driver}/index.mjs";
             PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
           };
 
