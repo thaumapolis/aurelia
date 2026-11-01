@@ -10,6 +10,21 @@ STATUS=0
 report() { printf '\n== %s ==\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; STATUS=1; }
 
+# Flags belong to specific phases, so pull them out here rather than handing
+# every phase the whole argument list. `--update` and `--engine` continue on to
+# the golden screenshots via "$@"; `--engines` is consumed here.
+ENGINES_FLAG=()
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  if [[ ${args[$i]} == '--engines' ]]; then
+    ENGINES_FLAG=(--engines "${args[$((i + 1))]:-}")
+    if [[ -z ${args[$((i + 1))]:-} ]]; then
+      echo "--engines needs a value, for example --engines firefox,chromium" >&2
+      exit 2
+    fi
+  fi
+done
+
 if [[ -z $NODE ]]; then
   fail "node is not on PATH. Run inside the project shell: nix develop --command ./check.sh"
   exit $STATUS
@@ -74,9 +89,14 @@ fi
 #    about whether the app runs in the others people actually use, so each
 #    required engine is booted and played with in turn. See tools/browser.mjs for
 #    which ones can start in which sandbox.
+#
+# `--engines` narrows this list, for a machine where an engine cannot start at
+# all - Chromium needs user-namespace syscalls that some sandboxes deny. It is
+# given only to this phase: forwarding every flag to every phase would let
+# `--engine`, which the screenshots take, reach the tests that do not read it.
 report "4/5 engine coverage"
 if [[ -n ${PLAYWRIGHT_ENTRY:-} && -n ${PLAYWRIGHT_BROWSERS_PATH:-} ]]; then
-  if "$NODE" tests/engines.test.mjs; then
+  if "$NODE" tests/engines.test.mjs "${ENGINES_FLAG[@]}"; then
     :
   else
     fail "engine coverage failed"
