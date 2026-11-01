@@ -61,7 +61,7 @@ nix-shell shell.nix --run ./check.sh  # same shell, pre-flake entry point
 1. **Build** the artifact, so tests never run against a stale `index.html`.
 2. **Syntax** - parse every source, tool and test file.
 3. **51 unit and interaction tests** - the wave physics, and the gestures: pluck versus bow versus mute, retuning, undo, cancelled pointers, multi-touch.
-4. **Engine coverage** - boot and play the instrument in Firefox and Chromium, asserting the strings are visible and no page error or network request occurs.
+4. **Engine coverage** - boot and play the instrument in Firefox and Chromium, asserting the strings are visible and no page error or network request occurs. This is behavioural, not pixel-based: a second engine differs in font rasterisation, so comparing it to the Firefox baselines would fail for reasons unrelated to the app. Narrow the list with `./check.sh --engines firefox` where an engine cannot start at all.
 5. **18 golden screenshots** - three viewports by six states, compared against committed baselines.
 
 The goldens are deterministic: a `?quiet=1` parameter hands the clock to the harness so frame *N* means the same thing on every run, and every scene reproduces at 0.000% difference. Regenerate them with:
@@ -78,10 +78,10 @@ node tests/golden.test.mjs --update     # after looking at every new baseline
 
 ## CI
 
-`.github/workflows/check.yml` runs the same `./check.sh` in the same pinned shell, so CI is not a second definition of correct. It runs on pushes and pull requests to `main`.
+`.github/workflows/check.yml` runs the same `./check.sh` in the same pinned shell, so CI is not a second definition of correct. It runs on pushes and pull requests to `main`, with `--engine firefox --engines firefox,chromium` named explicitly rather than left to defaults. Goldens are captured and compared in one process, so they are always checked by the engine that drew them; Chromium is required in the behavioural phase, and cannot own baselines Firefox painted.
 
 ## Known limits
 
 - Strings you draw go exactly where you draw them, including under the buttons; the layout rules only place the seeded instrument.
-- The goldens are verified on Firefox only, for the reason above. Chromium is covered by a behavioural smoke test rather than by pixels, and it has never run anywhere yet: the engine test was written in an environment where Chromium cannot start, so CI is its first execution.
+- The goldens are verified on Firefox only, for the reason above. Chromium is covered by a behavioural smoke test rather than by pixels.
 - Sound needs a browser gesture, so the first interaction is silent by design.

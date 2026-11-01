@@ -20,7 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: cachix/install-nix-action@V29
+      # Pinned to a release that exists. `@V29` looked plausible and resolved to
+      # nothing at all: the upstream tags are lowercase and three-part, so the
+      # job died in "Set up job" after 7 seconds, before a single test ran.
+      #   https://github.com/cachix/install-nix-action/releases/tag/v31.11.3
+      - uses: cachix/install-nix-action@v31.11.3
         with:
           # No nix_path: the flake is the input, and its lock file decides what
           # nixpkgs means. Pointing NIX_PATH somewhere else would let the
@@ -33,8 +37,16 @@ jobs:
       # screenshots. Exits non-zero if any phase cannot run, so a missing browser
       # or a missing baseline is a red build rather than a green one that checked
       # nothing.
+      # Both engines are named explicitly rather than left to defaults, and both
+      # are required: a phase that silently tested nothing must stay a red build.
+      #
+      # The two phases deliberately use different engines. Goldens are captured
+      # and compared inside one process, so the baselines can only ever be
+      # painted by the engine that checks them, and the committed baselines are
+      # Firefox. Chromium is exercised for behaviour instead, which is the part
+      # that transfers across engines.
       - name: Run the acceptance checklist
-        run: nix develop --command ./check.sh
+        run: nix develop --command ./check.sh --engine firefox --engines firefox,chromium
 
       # On failure, the frames CI saw are the difference between "the layout
       # moved" and "the font changed", so keep them.
