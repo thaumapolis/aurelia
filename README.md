@@ -82,16 +82,22 @@ node tests/golden.test.mjs --update     # after looking at every new baseline
 
 ### Which browser the screenshots use
 
-`DEFAULT_ENGINE` is **Firefox**, and that is a constraint of the environment rather than a preference. In the sandbox these checks run in, Chromium dies before it paints (SIGTRAP at `sandbox_host_linux.cc:41`, and crashpad `setsockopt: Operation not permitted`) even with `--no-sandbox`, and WebKit aborts at `Failed to adopt IPC::Connection socket`. Firefox needs none of the syscalls they want.
+`DEFAULT_ENGINE` is **Firefox**. The goldens are captured and compared inside one process, so a baseline can only ever be checked by the engine that drew it, and the committed set is Firefox.
 
-`--engine chromium` and `--engine webkit` are still available and fail loudly if the browser cannot start, rather than falling back to Firefox and reporting that they tested something they did not. **The committed baselines were produced by Firefox and are expected to differ in font rasterisation and anti-aliasing under another engine.** On a normal workstation all three should render; only Firefox is verified here.
+`--engine chromium` and `--engine webkit` are available and fail loudly if the browser cannot start, rather than falling back to Firefox and reporting that they tested something they did not. **The committed baselines are expected to differ under another engine**, in anti-aliasing rather than layout - the font is now embedded, so the glyphs themselves are identical everywhere.
+
+Some sandboxes cannot start Chromium at all: on the development machine used for this project it dies before painting (SIGTRAP at `sandbox_host_linux.cc:41`, and crashpad `setsockopt: Operation not permitted`) even with `--no-sandbox`, and WebKit aborts at `Failed to adopt IPC::Connection socket`. That is a property of the sandbox, not of the app - CI runs Chromium with no such trouble - and `--engines firefox` narrows the local run to match. Firefox happens to need none of the syscalls the others want.
 
 ## CI
 
-`.github/workflows/check.yml` runs the same `./check.sh` in the same pinned shell, so CI is not a second definition of correct. It runs on pushes and pull requests to `main`, with `--engine firefox --engines firefox,chromium` named explicitly rather than left to defaults. Goldens are captured and compared in one process, so they are always checked by the engine that drew them; Chromium is required in the behavioural phase, and cannot own baselines Firefox painted.
+![check](https://github.com/dniku/aurelia/actions/workflows/check.yml/badge.svg)
+
+`.github/workflows/check.yml` runs the same `./check.sh` in the same pinned shell, so CI is not a second definition of correct. It runs on pushes and pull requests to `main`, with `--engine firefox --engines firefox,chromium` named explicitly rather than left to defaults.
+
+CI is where Chromium is actually verified: the app boots there, seeds the instrument, and a scripted drag creates a string, in both engines. Pixel comparison stays on Firefox, for the reason above. On failure the job uploads the frames CI saw under `golden-actual`, which is the difference between "the layout moved" and "the font changed".
 
 ## Known limits
 
 - Strings you draw go exactly where you draw them, including under the buttons; the layout rules only place the seeded instrument.
-- The goldens are verified on Firefox only, for the reason above. Chromium is covered by a behavioural smoke test rather than by pixels.
+- The goldens are pixel-compared on Firefox only; Chromium is verified behaviourally, in CI. Rendering Chromium goldens would need its own committed baselines.
 - Sound needs a browser gesture, so the first interaction is silent by design.
