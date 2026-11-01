@@ -76,10 +76,52 @@ test('the starting strings differ enough in length to sound like a chord', () =>
   }
 });
 
+/**
+ * A horizontal stroke of up to `length` px that lies on genuinely blank canvas,
+ * preferring the longest blank run. The instrument is laid out from the free
+ * area, so fixed coordinates stop being blank whenever the layout moves, and a
+ * fixed length stops being available whenever the instrument fills the room it
+ * is given - on a desktop it is deliberately full-width, and the blank space
+ * that remains is between the strings rather than beside them.
+ *
+ * Asking the hit test where the space is keeps these tests about drawing rather
+ * than about arithmetic. `length` is therefore the longest stroke worth asking
+ * for, not a requirement: what the tests need is a stroke long enough to be a
+ * string rather than a tap, which the minimum audibly-long string already is.
+ */
+function blankDrag(app, length = 300) {
+  const reach = Math.round(app.bodyGrabPx());
+  const blank = (x, y) => app._hitTest(x, y).kind === 'none';
+  let best = null;
+  for (let y = reach + 10; y < app.height - reach; y += 10) {
+    for (let x = reach + 10; x + MIN_DRAW_LENGTH_PX <= app.width - reach; x += 10) {
+      if (!blank(x, y)) continue;
+      // Extend rightwards while the canvas stays blank, up to the length asked
+      // for; a run interrupted by a string still yields its blank prefix.
+      let stop = Math.min(x + length, app.width - reach);
+      for (let probe = x + 10; probe <= stop; probe += 10) {
+        if (!blank(probe, y)) {
+          stop = probe - 10;
+          break;
+        }
+      }
+      const run = { from: { x, y }, to: { x: stop, y } };
+      if (stop - x >= MIN_DRAW_LENGTH_PX && (!best || best.to.x - best.from.x < stop - x)) best = run;
+      break; // next row: this one cannot beat its own longest run
+    }
+  }
+  if (!best) throw new Error('no blank space to draw in');
+  return best;
+}
+
+/** Shorter than this, a stroke is a tap rather than a string worth drawing. */
+const MIN_DRAW_LENGTH_PX = 120;
+
 test('drawing on empty space creates a string whose pitch the app announces', () => {
   const { app, drag } = bootApp();
   const before = app.instrument.count;
-  drag({ x: 100, y: 120 }, { x: 620, y: 150 });
+  const { from, to } = blankDrag(app);
+  drag(from, to);
   assert.equal(app.instrument.count, before + 1, 'a drag on empty space should add a string');
   const line = app.instrument.strings.at(-1);
   assert.match(app.state.gesture, /new/);
@@ -107,9 +149,12 @@ test('dragging across an existing string plucks it rather than drawing over it',
   for (let i = 0; i < 60; i += 1) app.instrument.step(1 / 60, []);
   const before = line.amplitude();
   const count = app.instrument.count;
-  send('pointerdown', mid.x, mid.y - 30);
-  for (let i = 1; i <= 6; i += 1) send('pointermove', mid.x, mid.y - 30 + i * 15);
-  send('pointerup', mid.x, mid.y + 60);
+  // Fast and short: a pluck, not a rub. A slow 90px sweep across the same
+  // string is the bowing gesture tested next, so the two cases differ in speed
+  // and are separated deliberately rather than by whichever threshold trips.
+  send('pointerdown', mid.x, mid.y - 14);
+  for (let i = 1; i <= 4; i += 1) send('pointermove', mid.x, mid.y - 14 + i * 8);
+  send('pointerup', mid.x, mid.y + 18);
   app.frame(0);
   assert.equal(app.instrument.count, count, 'a pluck must not add a string');
   assert.equal(app.state.gesture, 'pluck');
@@ -128,7 +173,7 @@ test('holding still on a string mutes it, rubbing it sustains', () => {
   send('pointerdown', mid.x, mid.y);
   for (let i = 0; i < 30; i += 1) {
     send('pointermove', mid.x, mid.y);
-    app.instrument.step(1 / 60, []);
+    app.frame(i / 60, 1 / 60 * 1000);
   }
   assert.equal(app.touchMode, 'hold', 'a stationary finger should read as holding');
   assert.ok(line.held, 'the string should be marked held');
@@ -141,7 +186,7 @@ test('holding still on a string mutes it, rubbing it sustains', () => {
   send('pointerdown', mid.x - 90, mid.y);
   for (let i = 0; i < 60; i += 1) {
     send('pointermove', mid.x - 90 + i * 4, mid.y);
-    app.instrument.step(1 / 60, []);
+    app.frame(i / 60, 1 / 60 * 1000);
   }
   assert.equal(app.touchMode, 'bow', 'a rubbing finger should read as bowing');
   assert.ok(!line.held, 'bowing must not also hold the string');
@@ -180,15 +225,18 @@ test('a wild retune drag cannot collapse a string into noise', () => {
 
 test('Clear empties the instrument and undo removes the last string', () => {
   const { app, drag, ui } = bootApp();
-  drag({ x: 120, y: 110 }, { x: 700, y: 130 });
+  const first = blankDrag(app);
+  drag(first.from, first.to);
   const count = app.instrument.count;
   assert.ok(count > 4);
   ui.buttons.clear.click();
   assert.equal(app.instrument.count, 0);
   assert.match(app.state.detail, /cleared/);
 
-  drag({ x: 120, y: 110 }, { x: 700, y: 130 });
-  drag({ x: 120, y: 210 }, { x: 500, y: 230 });
+  const second = blankDrag(app);
+  drag(second.from, second.to);
+  const third = blankDrag(app, 300);
+  drag(third.from, third.to);
   const before = app.instrument.count;
   app.undo();
   assert.equal(app.instrument.count, before - 1);
@@ -243,16 +291,22 @@ test('the app reports strings and sounding counts that match the simulation', ()
   }
   app.frame(0);
   app._publishState();
-  assert.equal(app.state.strings, 4);
+  // The contract is that the reported number agrees with the simulation, not
+  // that the simulation holds a particular number: the seeded instrument is
+  // laid out from the viewport, so how many rows fit is a layout decision.
+  assert.equal(app.state.strings, app.instrument.count);
+  assert.ok(app.instrument.count >= 2, `expected a starting instrument, got ${app.instrument.count}`);
   assert.equal(app.state.sounding, 0, 'silent strings must not be counted as ringing');
   app.instrument.strings[0].pluck(0.5, 1.4, 1);
   for (let i = 0; i < 4; i += 1) app.instrument.step(1 / 60, []);
   app.frame(0);
   app._publishState();
   assert.equal(app.state.sounding, 1);
-  drag({ x: 120, y: 110 }, { x: 700, y: 130 });
+  const before = app.instrument.count;
+  const { from, to } = blankDrag(app);
+  drag(from, to);
   app._publishState();
-  assert.equal(app.state.strings, 5);
+  assert.equal(app.state.strings, before + 1, 'a new string should be counted');
 });
 
 test('a hover over a string is reported as an interaction target', () => {
@@ -291,12 +345,14 @@ test('the app survives a cancelled pointer (Android gesture takeover)', () => {
 test('two fingers do not corrupt each other', () => {
   const { app, send } = bootApp();
   const count = app.instrument.count;
-  send('pointerdown', 100, 110, { pointerId: 1 });
-  send('pointerdown', 200, 180, { pointerId: 2 });
-  send('pointermove', 400, 120, { pointerId: 1 });
-  send('pointermove', 500, 190, { pointerId: 2 });
-  send('pointerup', 400, 120, { pointerId: 1 });
-  send('pointerup', 500, 190, { pointerId: 2 });
+  const a = blankDrag(app, 300);
+  const b = blankDrag(app, 300);
+  send('pointerdown', a.from.x, a.from.y, { pointerId: 1 });
+  send('pointerdown', b.from.x, b.from.y, { pointerId: 2 });
+  send('pointermove', a.to.x, a.to.y, { pointerId: 1 });
+  send('pointermove', b.to.x, b.to.y, { pointerId: 2 });
+  send('pointerup', a.to.x, a.to.y, { pointerId: 1 });
+  send('pointerup', b.to.x, b.to.y, { pointerId: 2 });
   assert.equal(app.instrument.count, count + 2, 'both drags should have produced a string');
   assert.equal(app.activeGestures.length, 0);
 });
@@ -317,4 +373,69 @@ test('rendering is deterministic for a given simulation state', () => {
     'the same state must draw the same number of ops',
   );
   assert.ok(first.canvas._ops.length > 200, `expected a rich frame, got ${first.canvas._ops.length} ops`);
+});
+
+/**
+ * The rule for when the lesson panel moves the instrument.
+ *
+ * Earlier attempts got the two real viewports wrong in opposite directions:
+ * honouring the panel always cost a desktop a third of its string length, and
+ * exempting it left a portrait phone starting with half its instrument behind
+ * the instructions. The cost is measured in hidden string length because that is
+ * what the player loses, and the threshold means a panel is stepped around only
+ * when it covers most of the instrument - a panel that clips one row of four is
+ * cheaper to overlap than to move everything for.
+ *
+ * Each case pairs a panel with the free area its own viewport leaves, since the
+ * answer depends on both: the same 400px panel is a column beside a desktop
+ * instrument and a wall across a phone one.
+ */
+test('the lesson moves the instrument only when it covers the instrument', () => {
+  const { app } = bootApp();
+  const hides = (area, box) => app._lessonHidesRows(area, box);
+  const desktop = { left: 14, top: 76, right: 1266, bottom: 722 };
+  const portrait = { left: 14, top: 71, right: 376, bottom: 766 };
+  const landscape = { left: 14, top: 70, right: 830, bottom: 318 };
+
+  // The desktop lesson is a column in the top-left corner; the instrument is
+  // centred and long, so it runs clear of it.
+  assert.equal(hides(desktop, { left: 18, top: 74, right: 418, bottom: 383 }), false);
+  // The same panel across a phone's narrow free area is the whole width, and
+  // sits where every row is: the instrument has to move.
+  assert.equal(hides(portrait, { left: 18, top: 74, right: 372, bottom: 386 }), true);
+  // A landscape lesson is short, and only one of the four rows falls at its
+  // height: 22% of the strings. The instrument keeps its full length and the
+  // panel, which clamps itself in CSS, overlaps that one row instead.
+  assert.equal(hides(landscape, { left: 12, top: 211, right: 632, bottom: 306 }), false);
+  // A wide panel that only crosses empty space below the rows hides nothing.
+  assert.equal(hides(portrait, { left: 14, top: 750, right: 376, bottom: 766 }), false);
+  // A panel outside the free area hides nothing, however large it is.
+  assert.equal(hides(desktop, { left: 1266, top: 0, right: 1900, bottom: 800 }), false);
+  // Clipping one row out of four is 30% of the strings: the instrument stays
+  // put, because rebuilding it is the bigger loss. This is the deliberate
+  // limit of the rule, not an oversight.
+  assert.equal(hides(desktop, { left: 14, top: 100, right: 1266, bottom: 400 }), false);
+});
+
+test('a lesson the instrument cannot share is removed from the free area', () => {
+  const { app, ui } = bootApp({ width: 390, height: 844 });
+  const panel = ui.overlays.get('#learn');
+  // Match the portrait phone's real chrome, which this stub does not model: a
+  // caption across the top, meters beside it, and the buttons along the bottom.
+  Object.assign(ui.overlays.get('#brand'), { left: 18, top: 18, width: 114, height: 27, right: 132, bottom: 45 });
+  Object.assign(ui.overlays.get('#meters'), { left: 197, top: 18, width: 175, height: 39, right: 372, bottom: 57 });
+  Object.assign(ui.overlays.get('#readout'), { left: 18, top: 741, width: 354, height: 17, right: 372, bottom: 758 });
+  Object.assign(ui.overlays.get('#controls'), { left: 18, top: 782, width: 208, height: 44, right: 226, bottom: 826 });
+  Object.assign(ui.overlays.get('#about'), { left: 223, top: 780, width: 149, height: 46, right: 372, bottom: 826 });
+  // The portrait lesson, straight down from the caption: it lies across every
+  // row the instrument would occupy.
+  Object.assign(panel, { left: 18, top: 74, width: 354, height: 312, right: 372, bottom: 386 });
+  const area = app.freeArea();
+  assert.ok(
+    area.top >= 386,
+    `a portrait phone left the free area starting at ${area.top.toFixed(0)}, inside the lesson`,
+  );
+  // Dismissing the lesson releases the reservation.
+  panel.hidden = true;
+  assert.ok(app.freeArea().top < 386, 'a dismissed lesson must stop reserving space');
 });
