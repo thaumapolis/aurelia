@@ -39,7 +39,7 @@ fi
 mkdir -p .tmp
 
 # 1. Build. Tests read the artifact, so a stale artifact must not be able to pass.
-report "1/5 build artifact"
+report "1/6 build artifact"
 if "$NODE" tools/build.mjs; then
   :
 else
@@ -48,7 +48,7 @@ fi
 
 # 2. Bundles and tools must parse. Cheap, and it localises a syntax error to the
 #    file that has it rather than to whichever test happened to import it first.
-report "2/5 syntax"
+report "2/6 syntax"
 for file in src/*.js tools/*.mjs tests/*.mjs; do
   if ! "$NODE" --experimental-vm-modules -e '
     const fs = require("fs"), vm = require("vm");
@@ -66,7 +66,7 @@ done
 # result per *file*, so its "# pass" line counts files and could read 3 while the
 # suite inside it had failed to even load. Running the files and summing their own
 # counts is what makes the minimum-test-count guard below mean something.
-report "3/5 unit + interaction tests"
+report "3/6 unit + interaction tests"
 : >.tmp/test-output.txt
 PASSED_TOTAL=0
 for spec in tests/sim.test.mjs tests/app.test.mjs tests/build.test.mjs; do
@@ -109,7 +109,7 @@ fi
 # all - Chromium needs user-namespace syscalls that some sandboxes deny. It is
 # given only to this phase: forwarding every flag to every phase would let
 # `--engine`, which the screenshots take, reach the tests that do not read it.
-report "4/5 engine coverage"
+report "4/6 engine coverage"
 if [[ -n ${PLAYWRIGHT_ENTRY:-} && -n ${PLAYWRIGHT_BROWSERS_PATH:-} ]]; then
   if "$NODE" tests/engines.test.mjs "${ENGINES_FLAG[@]}"; then
     :
@@ -123,7 +123,7 @@ fi
 # 5. Golden screenshots. Needs a browser, which needs privileges the plain
 #    sandbox does not grant; without it the visual contract is unverified, so
 #    this is a failure and not a skip.
-report "5/5 golden screenshots"
+report "5/6 golden screenshots"
 if [[ -n ${PLAYWRIGHT_ENTRY:-} && -n ${PLAYWRIGHT_BROWSERS_PATH:-} ]]; then
   if "$NODE" tests/golden.test.mjs "$@"; then
     :
@@ -132,6 +132,34 @@ if [[ -n ${PLAYWRIGHT_ENTRY:-} && -n ${PLAYWRIGHT_BROWSERS_PATH:-} ]]; then
   fi
 else
   fail "browser toolchain is not configured (PLAYWRIGHT_ENTRY / PLAYWRIGHT_BROWSERS_PATH unset), so no page was painted. Run: nix develop --command ./check.sh"
+fi
+
+# 6. The published preview link.
+#
+# The README's "Play it live" URL is pinned to a commit so it cannot drift under
+# the document, which trades a rotting link for a maintenance obligation. This
+# is that obligation, enforced.
+#
+# The rule is deliberately *not* "the pin names HEAD": HEAD can never contain a
+# pin that names itself, so that version is unsatisfiable and passes only when
+# the README is dirty. The commit the link must name is the one that last
+# changed index.html, and the bytes it holds must be the artifact under test.
+report "6/6 published preview link"
+PIN=$(sed -n 's|.*rawcdn\.githack\.com/dniku/aurelia/\([0-9a-f]\{40\}\)/index\.html.*|\1|p' README.md | head -n 1)
+if [[ -z $PIN ]]; then
+  fail "README has no commit-pinned rawcdn.githack.com preview link"
+elif ! git cat-file -e "${PIN}^{commit}" 2>/dev/null; then
+  fail "README pins ${PIN:0:7}, which is not a commit in this repository"
+else
+  LAST=$(git log -1 --format=%H -- index.html)
+  if [[ $PIN != $LAST ]]; then
+    fail "README pins ${PIN:0:7} but index.html last changed at ${LAST:0:7}; republish and update the link"
+  fi
+  # The real property: what that commit serves is byte-for-byte what we just tested.
+  if ! diff -q <(git show "${PIN}:index.html") index.html >/dev/null; then
+    fail "index.html at ${PIN:0:7} differs from the artifact under test"
+  fi
+  printf 'pin %s serves this artifact\n' "${PIN:0:7}"
 fi
 
 printf '\n'

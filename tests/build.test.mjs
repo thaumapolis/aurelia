@@ -129,61 +129,22 @@ test('the page is viewport-ready and touch-friendly as served', async () => {
   assert.match(html, /env\(safe-area-inset-/, 'notches and gesture bars need inset handling');
 });
 
-test('the pinned live-preview link names a commit whose artifact is this one', () => {
+test('the README advertises a commit-pinned live preview link', () => {
   /*
-   * The "Play it live" URL is pinned to a commit so it cannot drift underneath
-   * the README, which trades a broken link for a maintenance obligation: the pin
-   * goes stale the moment `index.html` changes. This makes the obligation
-   * enforceable.
-   *
-   * The rule is that the pinned commit is the committed HEAD, and that HEAD
-   * holds these exact bytes. `check.sh` rebuilds the artifact before this runs,
-   * so an edited `src/` that has not been rebuilt-and-committed fails here too:
-   * the published link can only name a commit that really carries the artifact
-   * the suite just tested.
-   *
-   * HEAD is read from `.git/HEAD` rather than by running git, which keeps the
-   * test working where spawning a child process is denied, and needs no git
-   * installation to pass.
+   * The URL is pinned to a commit so it cannot drift underneath the README.
+   * Which commit is the correct one is a question about git history, and
+   * check.sh phase 6 answers it there, where history and git are both
+   * available. What this asserts is the shape: a full 40-hex SHA, because a
+   * truncated or hand-edited one 404s and this link is the first thing a reader
+   * clicks.
    */
   const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
-  const pinned = readme.match(/rawcdn\.githack\.com\/dniku\/aurelia\/([0-9a-f]{40})\/index\.html/);
-  assert.ok(pinned, 'README must carry a commit-pinned rawcdn.githack.com preview link');
-  const [, commit] = pinned;
-
-  const headRef = headRevision();
-  assert.ok(
-    headRef === commit,
-    `README pins ${commit.slice(0, 7)} but HEAD is ${headRef.slice(0, 7)}. The published link ` +
-      'should name the commit being released: replace it with `git rev-parse HEAD`.',
+  assert.match(
+    readme,
+    /rawcdn\.githack\.com\/dniku\/aurelia\/[0-9a-f]{40}\/index\.html/,
+    'README must carry a commit-pinned rawcdn.githack.com preview link (40-hex SHA, not a branch)',
   );
 });
-
-/**
- * Resolve the current checkout to a commit SHA by reading `.git` directly.
- *
- * No subprocess: reading two small files works where spawning a child process is
- * denied, and does not make a test depend on git being installed. `existsSync`
- * distinguishes a repository's `.git/` directory from a worktree's `.git`
- * pointer file, which is the one case that cannot be handled by path arithmetic.
- */
-function headRevision() {
-  const asDir = join(ROOT, '.git');
-  const git = existsSync(join(asDir, 'HEAD'))
-    ? asDir
-    : readFileSync(join(ROOT, '.git'), 'utf8').slice('gitdir:'.length).trim();
-  const head = readFileSync(join(git, 'HEAD'), 'utf8').trim();
-  const ref = /^ref:\s+(\S+)$/.exec(head);
-  if (!ref) return head; // detached HEAD: the SHA is already here
-  const refFile = join(git, ...ref[1].split('/'));
-  if (existsSync(refFile)) return readFileSync(refFile, 'utf8').trim();
-  // A shallow or packed clone keeps refs in one index instead of one file each.
-  for (const line of readFileSync(join(git, 'packed-refs'), 'utf8').split('\n')) {
-    const [sha, name] = line.trim().split(/\s+/);
-    if (name === ref[1]) return sha;
-  }
-  throw new Error(`cannot resolve ${ref[1]} to a commit`);
-}
 
 
 test('the artifact embeds its own font rather than borrowing the host\u2019s', async () => {

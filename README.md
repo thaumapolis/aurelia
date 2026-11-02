@@ -1,6 +1,6 @@
 # Aurelia
 
-[![check](https://github.com/dniku/aurelia/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/dniku/aurelia/actions/workflows/check.yml) **[▶ Play it live](https://rawcdn.githack.com/dniku/aurelia/577d970d1dd1d0bf855362c726820a1476d22967/index.html)**
+[![check](https://github.com/dniku/aurelia/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/dniku/aurelia/actions/workflows/check.yml) **[▶ Play it live](https://rawcdn.githack.com/dniku/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html)**
 
 An instrument you draw with your finger. Every line you stretch across the screen becomes a real wave simulation - a thread pinned at both ends, integrated in real time - and the shape you leave in it is the sound you hear.
 
@@ -60,14 +60,14 @@ It sets `text/html` and `Cache-Control: no-store`, because a phone that keeps a 
 
 ### Live, from the repo
 
-**<https://rawcdn.githack.com/dniku/aurelia/577d970d1dd1d0bf855362c726820a1476d22967/index.html>** runs the instrument straight out of this repository - no build, no hosting, nothing to install. That works only because the page is one file that asks for nothing else, font included, so there is no second request for a proxy to get wrong. That it is really this file is worth checking rather than taking on faith:
+**<https://rawcdn.githack.com/dniku/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html>** runs the instrument straight out of this repository - no build, no hosting, nothing to install. That works only because the page is one file that asks for nothing else, font included, so there is no second request for a proxy to get wrong. That it is really this file is worth checking rather than taking on faith:
 
 ```sh
-curl -s https://rawcdn.githack.com/dniku/aurelia/577d970d1dd1d0bf855362c726820a1476d22967/index.html | sha256sum
+curl -s https://rawcdn.githack.com/dniku/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html | sha256sum
 sha256sum index.html          # same digest
 ```
 
-The link is pinned to a commit rather than to `main` so it cannot drift under the README, which means **it has to be updated when the artifact changes** - substitute the new `git rev-parse HEAD`. `raw.githack.com/dniku/aurelia/main/index.html` is the moving form and needs no maintenance; both serve the same bytes.
+The link is pinned to a commit rather than to `main` so it cannot drift under the README. It must name **the commit that last changed `index.html`**, not `HEAD` - HEAD can never contain a pin naming itself, so that version of the rule cannot be satisfied and passes only while the README is uncommitted. `check.sh` phase 6 enforces the real rule and fails when the artifact changes under a stale pin, so the obligation cannot be quietly forgotten. `raw.githack.com/dniku/aurelia/main/index.html` is the moving form and needs no maintenance at all; both serve the same bytes.
 
 Two things to expect. rawgithack puts a one-time **External Content Notice** in front of any HTML it proxies, with an *Open the page* button, so the instrument is behind that click. And it caches, so a fresh push takes a moment to appear on the `main` form - a check shortly after pushing served a pre-font `index.html` for about a minute while the pinned-SHA form was already correct. It is somebody else's server, so treat it as a demo path; the file in this repository is the artifact.
 
@@ -92,13 +92,14 @@ nix develop --command ./check.sh      # flake-native
 nix-shell shell.nix --run ./check.sh  # same shell, pre-flake entry point
 ```
 
-`check.sh` runs five phases and treats any phase it cannot run as a failure rather than a skip, because a script that prints `ALL CHECKS PASSED` after painting nothing is worse than one that errors:
+`check.sh` runs six phases and treats any phase it cannot run as a failure rather than a skip, because a script that prints `ALL CHECKS PASSED` after painting nothing is worse than one that errors:
 
 1. **Build** the artifact, so tests never run against a stale `index.html`.
 2. **Syntax** - parse every source, tool and test file.
 3. **53 unit and interaction tests** - the wave physics, the gestures (pluck versus bow versus mute, retuning, undo, cancelled pointers, multi-touch), and the artifact's own promises: no network, no storage, and a font it owns.
 4. **Engine coverage** - boot and play the instrument in Firefox and Chromium, asserting the strings are visible and no page error or network request occurs. This is behavioural, not pixel-based: a second engine differs in font rasterisation, so comparing it to the Firefox baselines would fail for reasons unrelated to the app. Narrow the list with `./check.sh --engines firefox` where an engine cannot start at all.
 5. **18 golden screenshots** - three viewports by six states, compared against committed baselines.
+6. **Published preview link** - the README's pinned commit must be the one that last changed `index.html`, and must hold these exact bytes.
 
 The goldens are deterministic: a `?quiet=1` parameter hands the clock to the harness so frame *N* means the same thing on every run, and every scene reproduces at 0.000% difference. Regenerate them with:
 
