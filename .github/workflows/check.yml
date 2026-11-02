@@ -18,7 +18,15 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     steps:
+      # fetch-depth 0, not the default 1: phase 6 checks which commit last
+      # changed index.html and that the pinned one holds these bytes, and a
+      # shallow clone does not contain that commit. The default silently made
+      # the check report "not a commit in this repository" - true, and the
+      # wrong conclusion. The repository is a handful of commits and a few
+      # hundred KiB, so fetching it whole costs nothing.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Pinned to a release that exists. `@V29` looked plausible and resolved to
       # nothing at all: the upstream tags are lowercase and three-part, so the

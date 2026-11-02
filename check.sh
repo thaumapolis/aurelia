@@ -149,7 +149,14 @@ PIN=$(sed -n 's|.*rawcdn\.githack\.com/dniku/aurelia/\([0-9a-f]\{40\}\)/index\.h
 if [[ -z $PIN ]]; then
   fail "README has no commit-pinned rawcdn.githack.com preview link"
 elif ! git cat-file -e "${PIN}^{commit}" 2>/dev/null; then
-  fail "README pins ${PIN:0:7}, which is not a commit in this repository"
+  # Say which of the two it is. "Not a commit in this repository" is true of any
+  # pin under a shallow clone, which is how this message once sent someone
+  # hunting for a bad link that was fine - the clone was the problem.
+  if [[ -f .git/shallow ]]; then
+    fail "README pins ${PIN:0:7}, but this is a shallow clone, so history is not available to check it (need fetch-depth 0)"
+  else
+    fail "README pins ${PIN:0:7}, which is not a commit in this repository"
+  fi
 else
   LAST=$(git log -1 --format=%H -- index.html)
   if [[ $PIN != $LAST ]]; then
