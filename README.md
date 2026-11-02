@@ -1,5 +1,7 @@
 # Aurelia
 
+[![check](https://github.com/dniku/aurelia/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/dniku/aurelia/actions/workflows/check.yml) **[▶ Play it live](https://rawcdn.githack.com/dniku/aurelia/577d970d1dd1d0bf855362c726820a1476d22967/index.html)**
+
 An instrument you draw with your finger. Every line you stretch across the screen becomes a real wave simulation - a thread pinned at both ends, integrated in real time - and the shape you leave in it is the sound you hear.
 
 **[Open `index.html`](index.html)** in any modern browser. It is a single self-contained file with no network access, no build step, and no storage, so it also works inside a sandboxed `iframe` and offline from a local copy.
@@ -47,6 +49,30 @@ node tools/build.mjs          # writes index.html from src/
 
 `src/` is split into the wave simulation (`sim.js`), the audio graph (`audio.js`), the app and layout (`app.js`), and the boot wiring (`boot.js`); `tools/build-lib.mjs` inlines them into one file and refuses to emit a bundle with a duplicate top-level binding.
 
+Serving it is optional, and `serve.py` is there for the times a URL is wanted instead of a file - a phone on the same network, or a preview pane that cannot open a `file://` path:
+
+```sh
+./serve.py                    # http://127.0.0.1:8000/
+PORT=8123 ./serve.py          # a port you choose
+```
+
+It sets `text/html` and `Cache-Control: no-store`, because a phone that keeps a preview pane's old copy is a confusing way to discover the instrument has changed. It takes its bind address from `HOST`/`PASEO_PORT` when a Paseo daemon allocates the port, then `PORT`, then `127.0.0.1:8000`.
+
+### Live, from the repo
+
+**<https://rawcdn.githack.com/dniku/aurelia/577d970d1dd1d0bf855362c726820a1476d22967/index.html>** runs the instrument straight out of this repository - no build, no hosting, nothing to install. That works only because the page is one file that asks for nothing else, font included, so there is no second request for a proxy to get wrong. That it is really this file is worth checking rather than taking on faith:
+
+```sh
+curl -s https://rawcdn.githack.com/dniku/aurelia/577d970d1dd1d0bf855362c726820a1476d22967/index.html | sha256sum
+sha256sum index.html          # same digest
+```
+
+The link is pinned to a commit rather than to `main` so it cannot drift under the README, which means **it has to be updated when the artifact changes** - substitute the new `git rev-parse HEAD`. `raw.githack.com/dniku/aurelia/main/index.html` is the moving form and needs no maintenance; both serve the same bytes.
+
+Two things to expect. rawgithack puts a one-time **External Content Notice** in front of any HTML it proxies, with an *Open the page* button, so the instrument is behind that click. And it caches, so a fresh push takes a moment to appear on the `main` form - a check shortly after pushing served a pre-font `index.html` for about a minute while the pinned-SHA form was already correct. It is somebody else's server, so treat it as a demo path; the file in this repository is the artifact.
+
+`raw.githubusercontent.com` will not work, and not for the usual reason: GitHub serves it as `text/plain` with a sandboxing content-security-policy, and a browser runs no script from it at all. Stripping that is precisely what rawgithack exists to do.
+
 ### The font is embedded, and that is not optional
 
 The artifact ships its own font: DejaVu Sans Regular and Bold, subset to the characters the page can draw, base64-encoded as WOFF2 inside the stylesheet (~21 KiB). It asks for that face by one family name, `"Aurelia Sans"`, and never consults the host.
@@ -89,8 +115,6 @@ node tests/golden.test.mjs --update     # after looking at every new baseline
 Some sandboxes cannot start Chromium at all: on the development machine used for this project it dies before painting (SIGTRAP at `sandbox_host_linux.cc:41`, and crashpad `setsockopt: Operation not permitted`) even with `--no-sandbox`, and WebKit aborts at `Failed to adopt IPC::Connection socket`. That is a property of the sandbox, not of the app - CI runs Chromium with no such trouble - and `--engines firefox` narrows the local run to match. Firefox happens to need none of the syscalls the others want.
 
 ## CI
-
-![check](https://github.com/dniku/aurelia/actions/workflows/check.yml/badge.svg)
 
 `.github/workflows/check.yml` runs the same `./check.sh` in the same pinned shell, so CI is not a second definition of correct. It runs on pushes and pull requests to `main`, with `--engine firefox --engines firefox,chromium` named explicitly rather than left to defaults.
 
