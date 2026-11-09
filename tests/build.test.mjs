@@ -141,7 +141,7 @@ test('the README advertises a commit-pinned live preview link', () => {
   const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
   assert.match(
     readme,
-    /rawcdn\.githack\.com\/dniku\/aurelia\/[0-9a-f]{40}\/index\.html/,
+    /rawcdn\.githack\.com\/thaumapolis\/aurelia\/[0-9a-f]{40}\/index\.html/,
     'README must carry a commit-pinned rawcdn.githack.com preview link (40-hex SHA, not a branch)',
   );
 });

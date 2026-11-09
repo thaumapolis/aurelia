@@ -1,6 +1,6 @@
 # Aurelia
 
-[![check](https://github.com/dniku/aurelia/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/dniku/aurelia/actions/workflows/check.yml) **[▶ Play it live](https://rawcdn.githack.com/dniku/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html)**
+[![check](https://github.com/thaumapolis/aurelia/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/thaumapolis/aurelia/actions/workflows/check.yml) **[▶ Play it live](https://rawcdn.githack.com/thaumapolis/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html)**
 
 An instrument you draw with your finger. Every line you stretch across the screen becomes a real wave simulation - a thread pinned at both ends, integrated in real time - and the shape you leave in it is the sound you hear.
 
@@ -60,14 +60,14 @@ It sets `text/html` and `Cache-Control: no-store`, because a phone that keeps a 
 
 ### Live, from the repo
 
-**<https://rawcdn.githack.com/dniku/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html>** runs the instrument straight out of this repository - no build, no hosting, nothing to install. That works only because the page is one file that asks for nothing else, font included, so there is no second request for a proxy to get wrong. That it is really this file is worth checking rather than taking on faith:
+**<https://rawcdn.githack.com/thaumapolis/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html>** runs the instrument straight out of this repository - no build, no hosting, nothing to install. That works only because the page is one file that asks for nothing else, font included, so there is no second request for a proxy to get wrong. That it is really this file is worth checking rather than taking on faith:
 
 ```sh
-curl -s https://rawcdn.githack.com/dniku/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html | sha256sum
+curl -s https://rawcdn.githack.com/thaumapolis/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html | sha256sum
 sha256sum index.html          # same digest
 ```
 
-The link is pinned to a commit rather than to `main` so it cannot drift under the README. It must name **the commit that last changed `index.html`**, not `HEAD` - HEAD can never contain a pin naming itself, so that version of the rule cannot be satisfied and passes only while the README is uncommitted. `check.sh` phase 6 enforces the real rule and fails when the artifact changes under a stale pin, so the obligation cannot be quietly forgotten. `raw.githack.com/dniku/aurelia/main/index.html` is the moving form and needs no maintenance at all; both serve the same bytes.
+The link is pinned to a commit rather than to `main` so it cannot drift under the README. It must name **the commit that last changed `index.html`**, not `HEAD` - HEAD can never contain a pin naming itself, so that version of the rule cannot be satisfied and passes only while the README is uncommitted. `check.sh` phase 6 enforces the real rule and fails when the artifact changes under a stale pin, so the obligation cannot be quietly forgotten. `raw.githack.com/thaumapolis/aurelia/main/index.html` is the moving form and needs no maintenance at all; both serve the same bytes.
 
 Two things to expect. rawgithack puts a one-time **External Content Notice** in front of any HTML it proxies, with an *Open the page* button, so the instrument is behind that click. And it caches, so a fresh push takes a moment to appear on the `main` form - a check shortly after pushing served a pre-font `index.html` for about a minute while the pinned-SHA form was already correct. It is somebody else's server, so treat it as a demo path; the file in this repository is the artifact.
 
