@@ -145,7 +145,7 @@ fi
 # the README is dirty. The commit the link must name is the one that last
 # changed index.html, and the bytes it holds must be the artifact under test.
 report "6/6 published preview link"
-PIN=$(sed -n 's|.*rawcdn\.githack\.com/dniku/aurelia/\([0-9a-f]\{40\}\)/index\.html.*|\1|p' README.md | head -n 1)
+PIN=$(sed -n 's|.*rawcdn\.githack\.com/thaumapolis/aurelia/\([0-9a-f]\{40\}\)/index\.html.*|\1|p' README.md | head -n 1)
 if [[ -z $PIN ]]; then
   fail "README has no commit-pinned rawcdn.githack.com preview link"
 elif ! git cat-file -e "${PIN}^{commit}" 2>/dev/null; then
