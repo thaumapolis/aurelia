@@ -1,5 +1,7 @@
 # Aurelia
 
+<!-- Front page image: docs/screens/desktop-bowed.png -->
+
 [![check](https://github.com/thaumapolis/aurelia/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/thaumapolis/aurelia/actions/workflows/check.yml) **[▶ Play it live](https://rawcdn.githack.com/thaumapolis/aurelia/d4efe20408ea84363ebd3745ca7a2156706823cc/index.html)**
 
 An instrument you draw with your finger. Every line you stretch across the screen becomes a real wave simulation - a thread pinned at both ends, integrated in real time - and the shape you leave in it is the sound you hear.
